@@ -100,16 +100,24 @@ func (fetcher *Fetcher) partURL(selection Selection, indexType, partName string)
 // publisher split it, and returns the path to the complete file.
 //
 // A missing manifest means the archive was published whole, so the plain path still works.
+//
+// A manifest that exists but cannot be satisfied also falls back to the whole archive. That
+// matters because a dataset can be in a mixed state while a publication is in progress, or
+// because a split was abandoned after its manifest was committed. Trusting the manifest in
+// that state would fail outright, where the whole archive is very likely present.
 func (fetcher *Fetcher) fetchPublishedArchive(ctx context.Context, selection Selection, indexType, staging string) (string, error) {
 	archive := filepath.Join(staging, ArchiveName(selection, indexType))
-
-	manifestBytes, err := fetcher.Client.FetchResource(ctx, fetcher.ManifestURL(selection, indexType))
-	if errors.Is(err, download.ErrResourceNotFound) {
+	wholeArchive := func() (string, error) {
 		url := fetcher.ArchiveURL(selection, indexType)
 		if err := fetcher.Client.Download(ctx, url, archive); err != nil {
 			return "", fmt.Errorf("download %s: %w", url, err)
 		}
 		return archive, nil
+	}
+
+	manifestBytes, err := fetcher.Client.FetchResource(ctx, fetcher.ManifestURL(selection, indexType))
+	if errors.Is(err, download.ErrResourceNotFound) {
+		return wholeArchive()
 	}
 	if err != nil {
 		return "", fmt.Errorf("read parts manifest: %w", err)
@@ -123,6 +131,16 @@ func (fetcher *Fetcher) fetchPublishedArchive(ctx context.Context, selection Sel
 		return "", err
 	}
 
+	assembled, partsErr := fetcher.assembleParts(ctx, selection, indexType, staging, archive, manifest)
+	if partsErr != nil {
+		fmt.Fprintf(os.Stderr, "  warning: %v; falling back to the whole archive\n", partsErr)
+		return wholeArchive()
+	}
+	return assembled, nil
+}
+
+// assembleParts downloads every part, verifies it, joins the parts and verifies the result.
+func (fetcher *Fetcher) assembleParts(ctx context.Context, selection Selection, indexType, staging, archive string, manifest PartsManifest) (string, error) {
 	partPaths := make([]string, 0, len(manifest.Parts))
 	for _, part := range manifest.Parts {
 		partPath := filepath.Join(staging, part.Name)
