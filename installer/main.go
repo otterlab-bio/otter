@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/otterlab-bio/otter/installer/internal/assets"
@@ -156,7 +157,46 @@ func run(ctx context.Context, options *config.Options) error {
 		}
 	}
 
+	// Step 7: Fetch published reference index builds.
+	if options.ReferenceFetch {
+		if err := runReferenceFetch(ctx, options, client); err != nil {
+			return err
+		}
+	}
+
 	printCompletionSummary(options)
+	return nil
+}
+
+// runReferenceFetch downloads index builds that were published once and extracts them into the
+// registry, so a machine does not have to rebuild STAR, bowtie2 and Bismark indexes locally.
+func runReferenceFetch(ctx context.Context, options *config.Options, client *download.Client) error {
+	fetchConfig := options.ReferenceFetchConfig
+	selections, err := reference.ParseSelections(fetchConfig.Releases)
+	if err != nil {
+		return err
+	}
+	var indexTypes []string
+	for _, indexType := range strings.Split(fetchConfig.IndexTypes, ",") {
+		if trimmed := strings.TrimSpace(indexType); trimmed != "" {
+			indexTypes = append(indexTypes, trimmed)
+		}
+	}
+	fmt.Printf("Step 7: Fetching reference indexes from %s\n", fetchConfig.Repo)
+	fetcher := &reference.Fetcher{
+		BaseURL:      fetchConfig.BaseURL,
+		Repo:         fetchConfig.Repo,
+		Revision:     fetchConfig.Revision,
+		RegistryRoot: fetchConfig.RegistryRoot,
+		IndexTypes:   indexTypes,
+		Selections:   selections,
+		Client:       client,
+		DryRun:       options.DryRun,
+	}
+	if err := fetcher.Fetch(ctx); err != nil {
+		return err
+	}
+	fmt.Printf("  registry root: %s\n\n", fetchConfig.RegistryRoot)
 	return nil
 }
 

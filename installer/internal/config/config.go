@@ -58,6 +58,12 @@ type Options struct {
 	// ReferenceBuild overrides (OTTER_REFERENCE_BUILD_*).
 	ReferenceBuildConfig ReferenceBuildConfig
 
+	// ReferenceFetch downloads published index builds rather than compiling them.
+	ReferenceFetch bool
+
+	// ReferenceFetchConfig holds the OTTER_REFERENCE_FETCH_* overrides.
+	ReferenceFetchConfig ReferenceFetchConfig
+
 	// GitHubToken is the optional authentication token for private releases.
 	GitHubToken string
 
@@ -97,8 +103,30 @@ type ReferenceBuildConfig struct {
 	STARBinary             string
 }
 
+// ReferenceFetchConfig holds the OTTER_REFERENCE_FETCH_* overrides.
+type ReferenceFetchConfig struct {
+	// Repo is the dataset repository holding the published index archives.
+	Repo string
+	// Releases is a comma-separated list of <id>@<release> selections.
+	Releases string
+	// IndexTypes is a comma-separated subset of bismark,bowtie2,star.
+	IndexTypes string
+	// BaseURL is the dataset host; a mirror can be substituted where the default is blocked.
+	BaseURL string
+	// Revision is the dataset revision to resolve.
+	Revision string
+	// RegistryRoot is the directory containing genomes/.
+	RegistryRoot string
+}
+
 // DefaultReleasesRepo is the primary public release repository.
 const DefaultReleasesRepo = "otterlab-bio/otter"
+
+// DefaultReferenceFetchRepo is the dataset that mirrors the reference registry layout.
+const DefaultReferenceFetchRepo = "fallingstar10/xdxtools-genomes"
+
+// DefaultReferenceFetchBaseURL is the public dataset host.
+const DefaultReferenceFetchBaseURL = "https://huggingface.co"
 
 // DefaultFallbackReleasesRepo is the fallback release repository.
 const DefaultFallbackReleasesRepo = "otterlab-bio/otter"
@@ -123,6 +151,7 @@ func Parse(arguments []string) (*Options, error) {
 	flagSet.StringVar(&options.GitHubProxy, "github-proxy", "", "Optional GitHub proxy prefix")
 	flagSet.StringVar(&options.Lang, "lang", "", "Interface language: en or zh")
 	flagSet.BoolVar(&options.ReferenceBuild, "reference-build", false, "Download and run the Craftmake ReferenceBuild workflow")
+	flagSet.BoolVar(&options.ReferenceFetch, "reference-fetch", false, "Download published reference index builds from the dataset")
 
 	if err := flagSet.Parse(arguments); err != nil {
 		return nil, err
@@ -162,7 +191,25 @@ func Parse(arguments []string) (*Options, error) {
 	}
 
 	options.ReferenceBuildConfig = readReferenceBuildConfig(options.Home, options.InstallDir)
+	options.ReferenceFetchConfig = readReferenceFetchConfig(options.Home)
 	return options, nil
+}
+
+// readReferenceFetchConfig resolves the dataset fetch settings. The registry root is shared
+// with ReferenceBuild so a fetched release lands wherever a built one would.
+func readReferenceFetchConfig(home string) ReferenceFetchConfig {
+	registryRoot := envOr("OTTER_REFERENCE_FETCH_REGISTRY_ROOT", "")
+	if registryRoot == "" {
+		registryRoot = envOr("OTTER_REFERENCE_BUILD_REGISTRY_ROOT", filepath.Join(home, ".otter", "references"))
+	}
+	return ReferenceFetchConfig{
+		Repo:         envOr("OTTER_REFERENCE_FETCH_REPO", DefaultReferenceFetchRepo),
+		Releases:     envOr("OTTER_REFERENCE_FETCH_RELEASES", ""),
+		IndexTypes:   envOr("OTTER_REFERENCE_FETCH_INDEX_TYPES", ""),
+		BaseURL:      envOr("OTTER_REFERENCE_FETCH_BASE_URL", DefaultReferenceFetchBaseURL),
+		Revision:     envOr("OTTER_REFERENCE_FETCH_REVISION", "main"),
+		RegistryRoot: registryRoot,
+	}
 }
 
 func readReferenceBuildConfig(home, installDir string) ReferenceBuildConfig {
