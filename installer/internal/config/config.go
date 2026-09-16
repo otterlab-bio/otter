@@ -120,7 +120,7 @@ type ReferenceFetchConfig struct {
 }
 
 // DefaultReleasesRepo is the primary public release repository.
-const DefaultReleasesRepo = "rainoffallingstar/otter"
+const DefaultReleasesRepo = "otterlab-bio/otter"
 
 // DefaultReferenceFetchRepo is the dataset that mirrors the reference registry layout.
 const DefaultReferenceFetchRepo = "fallingstar10/xdxtools-genomes"
@@ -129,10 +129,10 @@ const DefaultReferenceFetchRepo = "fallingstar10/xdxtools-genomes"
 const DefaultReferenceFetchBaseURL = "https://huggingface.co"
 
 // DefaultFallbackReleasesRepo is the fallback release repository.
-const DefaultFallbackReleasesRepo = "rainoffallingstar/otter"
+const DefaultFallbackReleasesRepo = "otterlab-bio/otter"
 
 // DefaultCraftmakeReleasesRepo is the Craftmake release repository.
-const DefaultCraftmakeReleasesRepo = "rainoffallingstar/craftmake"
+const DefaultCraftmakeReleasesRepo = "otterlab-bio/craftmake"
 
 // Parse builds Options from command-line flags and environment variables.
 func Parse(arguments []string) (*Options, error) {
