@@ -109,8 +109,8 @@ type ReferenceFetchConfig struct {
 	Repo string
 	// Releases is a comma-separated list of <id>@<release> selections.
 	Releases string
-	// IndexTypes is a comma-separated subset of bismark,bowtie2,star.
-	IndexTypes string
+	// Assets is a comma-separated subset of bismark,bowtie2,star,fasta,annotations.
+	Assets string
 	// BaseURL is the dataset host; a mirror can be substituted where the default is blocked.
 	BaseURL string
 	// Revision is the dataset revision to resolve.
@@ -120,7 +120,7 @@ type ReferenceFetchConfig struct {
 }
 
 // DefaultReleasesRepo is the primary public release repository.
-const DefaultReleasesRepo = "otterlab-bio/otter"
+const DefaultReleasesRepo = "rainoffallingstar/otter"
 
 // DefaultReferenceFetchRepo is the dataset that mirrors the reference registry layout.
 const DefaultReferenceFetchRepo = "fallingstar10/xdxtools-genomes"
@@ -129,10 +129,10 @@ const DefaultReferenceFetchRepo = "fallingstar10/xdxtools-genomes"
 const DefaultReferenceFetchBaseURL = "https://huggingface.co"
 
 // DefaultFallbackReleasesRepo is the fallback release repository.
-const DefaultFallbackReleasesRepo = "otterlab-bio/otter"
+const DefaultFallbackReleasesRepo = "rainoffallingstar/otter"
 
 // DefaultCraftmakeReleasesRepo is the Craftmake release repository.
-const DefaultCraftmakeReleasesRepo = "otterlab-bio/craftmake"
+const DefaultCraftmakeReleasesRepo = "rainoffallingstar/craftmake"
 
 // Parse builds Options from command-line flags and environment variables.
 func Parse(arguments []string) (*Options, error) {
@@ -205,7 +205,7 @@ func readReferenceFetchConfig(home string) ReferenceFetchConfig {
 	return ReferenceFetchConfig{
 		Repo:         envOr("OTTER_REFERENCE_FETCH_REPO", DefaultReferenceFetchRepo),
 		Releases:     envOr("OTTER_REFERENCE_FETCH_RELEASES", ""),
-		IndexTypes:   envOr("OTTER_REFERENCE_FETCH_INDEX_TYPES", ""),
+		Assets:       envOr("OTTER_REFERENCE_FETCH_ASSETS", ""),
 		BaseURL:      envOr("OTTER_REFERENCE_FETCH_BASE_URL", DefaultReferenceFetchBaseURL),
 		Revision:     envOr("OTTER_REFERENCE_FETCH_REVISION", "main"),
 		RegistryRoot: registryRoot,

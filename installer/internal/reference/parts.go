@@ -86,14 +86,14 @@ func (fetcher *Fetcher) resourceURL(resourcePath string) string {
 		strings.TrimSuffix(fetcher.BaseURL, "/"), fetcher.Repo, fetcher.Revision, resourcePath)
 }
 
-// ManifestURL is where an archive's parts manifest is published.
-func (fetcher *Fetcher) ManifestURL(selection Selection, indexType string) string {
-	return fetcher.resourceURL(ArchivePath(selection, indexType) + PartsManifestSuffix)
+// ManifestURL is where an asset's parts manifest is published.
+func (fetcher *Fetcher) ManifestURL(selection Selection, asset Asset) string {
+	return fetcher.resourceURL(AssetArchivePath(selection, asset) + PartsManifestSuffix)
 }
 
 // partURL is where one part lives, beside the archive it belongs to.
-func (fetcher *Fetcher) partURL(selection Selection, indexType, partName string) string {
-	return fetcher.resourceURL(path.Dir(ArchivePath(selection, indexType)) + "/" + partName)
+func (fetcher *Fetcher) partURL(selection Selection, asset Asset, partName string) string {
+	return fetcher.resourceURL(path.Dir(AssetArchivePath(selection, asset)) + "/" + partName)
 }
 
 // fetchPublishedArchive obtains the archive in staging, reassembling it from parts when the
@@ -105,17 +105,17 @@ func (fetcher *Fetcher) partURL(selection Selection, indexType, partName string)
 // matters because a dataset can be in a mixed state while a publication is in progress, or
 // because a split was abandoned after its manifest was committed. Trusting the manifest in
 // that state would fail outright, where the whole archive is very likely present.
-func (fetcher *Fetcher) fetchPublishedArchive(ctx context.Context, selection Selection, indexType, staging string) (string, error) {
-	archive := filepath.Join(staging, ArchiveName(selection, indexType))
+func (fetcher *Fetcher) fetchPublishedArchive(ctx context.Context, selection Selection, asset Asset, staging string) (string, error) {
+	archive := filepath.Join(staging, ArchiveFileName(selection, asset))
 	wholeArchive := func() (string, error) {
-		url := fetcher.ArchiveURL(selection, indexType)
+		url := fetcher.assetURL(selection, asset)
 		if err := fetcher.Client.Download(ctx, url, archive); err != nil {
 			return "", fmt.Errorf("download %s: %w", url, err)
 		}
 		return archive, nil
 	}
 
-	manifestBytes, err := fetcher.Client.FetchResource(ctx, fetcher.ManifestURL(selection, indexType))
+	manifestBytes, err := fetcher.Client.FetchResource(ctx, fetcher.ManifestURL(selection, asset))
 	if errors.Is(err, download.ErrResourceNotFound) {
 		return wholeArchive()
 	}
@@ -131,7 +131,7 @@ func (fetcher *Fetcher) fetchPublishedArchive(ctx context.Context, selection Sel
 		return "", err
 	}
 
-	assembled, partsErr := fetcher.assembleParts(ctx, selection, indexType, staging, archive, manifest)
+	assembled, partsErr := fetcher.assembleParts(ctx, selection, asset, staging, archive, manifest)
 	if partsErr != nil {
 		fmt.Fprintf(os.Stderr, "  warning: %v; falling back to the whole archive\n", partsErr)
 		return wholeArchive()
@@ -140,11 +140,11 @@ func (fetcher *Fetcher) fetchPublishedArchive(ctx context.Context, selection Sel
 }
 
 // assembleParts downloads every part, verifies it, joins the parts and verifies the result.
-func (fetcher *Fetcher) assembleParts(ctx context.Context, selection Selection, indexType, staging, archive string, manifest PartsManifest) (string, error) {
+func (fetcher *Fetcher) assembleParts(ctx context.Context, selection Selection, asset Asset, staging, archive string, manifest PartsManifest) (string, error) {
 	partPaths := make([]string, 0, len(manifest.Parts))
 	for _, part := range manifest.Parts {
 		partPath := filepath.Join(staging, part.Name)
-		if err := fetcher.Client.Download(ctx, fetcher.partURL(selection, indexType, part.Name), partPath); err != nil {
+		if err := fetcher.Client.Download(ctx, fetcher.partURL(selection, asset, part.Name), partPath); err != nil {
 			return "", fmt.Errorf("download part %s: %w", part.Name, err)
 		}
 		if err := verifyFileSHA256(partPath, part.SHA256); err != nil {

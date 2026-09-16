@@ -77,15 +77,33 @@ func TestArchiveLocationFollowsTheRegistryLayout(t *testing.T) {
 	fetcher := &Fetcher{BaseURL: "https://example.test/", Repo: "owner/dataset", Revision: "main", RegistryRoot: "/registry"}
 	selection := Selection{ID: "hg19", Release: "GRCh37.p13-gencode-v19"}
 
-	if got, want := ArchiveName(selection, "bowtie2"), "hg19_GRCh37.p13-gencode-v19_bowtie2.tar.gz"; got != want {
-		t.Errorf("ArchiveName = %q, want %q", got, want)
+	index := Asset{Name: "bowtie2", Segment: "indexes"}
+	if got, want := ArchiveFileName(selection, index), "hg19_GRCh37.p13-gencode-v19_bowtie2.tar.gz"; got != want {
+		t.Errorf("ArchiveFileName = %q, want %q", got, want)
 	}
-	if got, want := ArchivePath(selection, "bowtie2"), "genomes/hg19/GRCh37.p13-gencode-v19/indexes/hg19_GRCh37.p13-gencode-v19_bowtie2.tar.gz"; got != want {
-		t.Errorf("ArchivePath = %q, want %q", got, want)
+	if got, want := AssetArchivePath(selection, index), "genomes/hg19/GRCh37.p13-gencode-v19/indexes/hg19_GRCh37.p13-gencode-v19_bowtie2.tar.gz"; got != want {
+		t.Errorf("AssetArchivePath = %q, want %q", got, want)
 	}
-	if got, want := fetcher.ArchiveURL(selection, "bowtie2"),
+	if got, want := fetcher.assetURL(selection, index),
 		"https://example.test/datasets/owner/dataset/resolve/main/genomes/hg19/GRCh37.p13-gencode-v19/indexes/hg19_GRCh37.p13-gencode-v19_bowtie2.tar.gz"; got != want {
-		t.Errorf("ArchiveURL = %q, want %q", got, want)
+		t.Errorf("assetURL = %q, want %q", got, want)
+	}
+	// A release-root archive keeps a bare name, since its directory already scopes it.
+	sequence := Asset{Name: "fasta"}
+	if got, want := ArchiveFileName(selection, sequence), "fasta.tar.gz"; got != want {
+		t.Errorf("ArchiveFileName(fasta) = %q, want %q", got, want)
+	}
+	if got, want := AssetArchivePath(selection, sequence), "genomes/hg19/GRCh37.p13-gencode-v19/fasta.tar.gz"; got != want {
+		t.Errorf("AssetArchivePath(fasta) = %q, want %q", got, want)
+	}
+	if got, want := AssetDirectory(sequence), "fasta"; got != want {
+		t.Errorf("AssetDirectory(fasta) = %q, want %q", got, want)
+	}
+	if got, want := AssetDirectory(index), "indexes/bowtie2"; got != want {
+		t.Errorf("AssetDirectory(index) = %q, want %q", got, want)
+	}
+	if got, want := ContractFilePath(selection, "reference.yaml"), "genomes/hg19/GRCh37.p13-gencode-v19/reference.yaml"; got != want {
+		t.Errorf("ContractFilePath = %q, want %q", got, want)
 	}
 	if got, want := fetcher.ReleaseDirectory(selection), filepath.Join("/registry", "genomes", "hg19", "GRCh37.p13-gencode-v19"); got != want {
 		t.Errorf("ReleaseDirectory = %q, want %q", got, want)
@@ -97,23 +115,38 @@ func TestArchiveLocationFollowsTheRegistryLayout(t *testing.T) {
 
 func TestVerifyArchiveRoot(t *testing.T) {
 	tests := []struct {
-		name    string
-		entries []string
-		wantErr bool
+		name         string
+		entries      []string
+		wantErr      bool
+		expectedRoot string
 	}{
 		{
-			name:    "contract layout is accepted",
-			entries: []string{"indexes/bowtie2/genome.1.bt2", "indexes/bowtie2/genome.rev.1.bt2"},
+			name:         "index layout accepted",
+			entries:      []string{"indexes/bowtie2/genome.1.bt2", "indexes/bowtie2/genome.rev.1.bt2"},
+			expectedRoot: "indexes/bowtie2",
 		},
 		{
-			name:    "bare directory name is rejected",
-			entries: []string{"bowtie2/genome.1.bt2"},
-			wantErr: true,
+			name:         "sequence layout accepted",
+			entries:      []string{"fasta/genome.fa", "fasta/genome.fa.fai"},
+			expectedRoot: "fasta",
 		},
 		{
-			name:    "single file at the root is rejected",
-			entries: []string{"genome.1.bt2"},
-			wantErr: true,
+			name:         "bare directory name is rejected",
+			entries:      []string{"bowtie2/genome.1.bt2"},
+			expectedRoot: "indexes/bowtie2",
+			wantErr:      true,
+		},
+		{
+			name:         "single file at the root is rejected",
+			entries:      []string{"genome.1.bt2"},
+			expectedRoot: "indexes/bowtie2",
+			wantErr:      true,
+		},
+		{
+			name:         "a fasta archive is not accepted as an index",
+			entries:      []string{"fasta/genome.fa"},
+			expectedRoot: "indexes/bowtie2",
+			wantErr:      true,
 		},
 	}
 	for _, test := range tests {
@@ -138,7 +171,7 @@ func TestVerifyArchiveRoot(t *testing.T) {
 			if output, err := command.CombinedOutput(); err != nil {
 				t.Fatalf("building the fixture archive failed: %v %s", err, output)
 			}
-			err := verifyArchiveRoot(context.Background(), archive)
+			err := verifyArchiveRoot(context.Background(), archive, test.expectedRoot)
 			if test.wantErr && err == nil {
 				t.Fatal("expected the archive to be rejected")
 			}

@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/otterlab-bio/otter/installer/internal/assets"
@@ -176,19 +175,13 @@ func runReferenceFetch(ctx context.Context, options *config.Options, client *dow
 	if err != nil {
 		return err
 	}
-	var indexTypes []string
-	for _, indexType := range strings.Split(fetchConfig.IndexTypes, ",") {
-		if trimmed := strings.TrimSpace(indexType); trimmed != "" {
-			indexTypes = append(indexTypes, trimmed)
-		}
-	}
-	fmt.Printf("Step 7: Fetching reference indexes from %s\n", fetchConfig.Repo)
+	fmt.Printf("Step 7: Fetching reference release from %s\n", fetchConfig.Repo)
 	fetcher := &reference.Fetcher{
 		BaseURL:      fetchConfig.BaseURL,
 		Repo:         fetchConfig.Repo,
 		Revision:     fetchConfig.Revision,
 		RegistryRoot: fetchConfig.RegistryRoot,
-		IndexTypes:   indexTypes,
+		AssetNames:   fetchConfig.Assets,
 		Selections:   selections,
 		Client:       client,
 		DryRun:       options.DryRun,
