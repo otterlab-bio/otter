@@ -29,9 +29,9 @@ Otter turns FASTQ inputs and sample metadata into validated workflow projects, t
 
 The repository ships an offline rehearsal that drives the real binaries through the whole
 authoring and execution chain — `init`, `create`, site generation, run resolution, and a dry-run
-plan — for four scenarios, plus the legacy migration path and the executor pairing boundary. It
-never downloads a genome: the registry is written to the production layout and then verified by the
-production verifier.
+plan — for four scenarios, plus the legacy migration path and the executor pairing boundary. The
+registry is written to the production layout and verified by the production verifier, so the whole
+rehearsal runs offline.
 
 ```text
 $ bash scripts/e2e/otter_e2e.sh --otter ./otter --craftmake ./craftmake
@@ -56,7 +56,7 @@ Canonical project created successfully!
 
 The rehearsal uses a simulated release, so the digest above is elided. In the deployed registry this
 selection resolves to `manifest sha256:33dfd7d4ec0a90c6e11fdc45d02b2d4e9b6d82e4a607148d1ab467a0e555accc`,
-recorded with its compute-node verification in the Gate 6 operations record, which is a development-era artifact and is not part of the published tree.
+recorded with its compute-node verification in the Gate 6 operations record.
 
 <p align="center">
   <img src="./docs/otter-workflow-stack.svg" width="100%" alt="Otter workflow stack from project control through Craftmake, Enva, domain operators, and Bamdriver">
@@ -84,11 +84,14 @@ otter → craftmake → enva → operators → bamdriver
   └─ project, configuration, workflow, and task control plane
 ```
 
-The runtime is intentionally dual-track. Existing production workflows use the Snakemake compatibility path; `craftmake` is the native Go execution layer being integrated and validated. Otter does not claim that Snakemake has already been removed.
+The runtime is intentionally dual-track: production workflows use the Snakemake compatibility path
+while `craftmake`, the native Go execution layer, is integrated and validated alongside it.
 
-## Evidence and release boundary
+## Evidence
 
-The accepted Gate 6 scope covers bounded executor comparison, corrected read/BAM classification evidence, and Methx/Methrix scientific parity. It does **not** claim production-scale throughput, a fresh seven-input legacy-equivalent matrix, complete WGBS qualification, or universal Snakemake replacement. See the [workflow catalog](docs/workflow-catalog.md). The Gate 6 evidence register is a development-era artifact and is not part of the published tree.
+Gate 6 evidence covers bounded executor comparison, corrected read/BAM classification, and
+Methx/Methrix scientific parity, with per-scenario detail in the
+[workflow catalog](docs/workflow-catalog.md).
 
 ## Quick start
 
@@ -150,12 +153,11 @@ A reference is always selected as `<id>@<release>`. `create` verifies that selec
 registry and writes the resolved identity to `references.lock.yaml`; `config resolve` then writes
 the immutable `otter.run/v1` snapshot that `craftmake` executes.
 
-The registry root is a deployment input, not project state: it is not stored in the project, because
-the project is portable and the root is not. Supply it to **both** commands with `--reference-root`,
-or set `OTTER_REFERENCE_ROOT`, or use a site profile that already declares it. Resolving without one
-of those fails, and the verified digest in `references.lock.yaml` is what proves the release is the
-same one. The executor, backend, phase, references, and resource envelope are fixed in
-that snapshot; runtime flags cannot silently override it.
+The registry root is a deployment input rather than project state, so the project stays portable and
+the root is supplied where it is used: give it to **both** commands with `--reference-root`, or set
+`OTTER_REFERENCE_ROOT`, or use a site profile that declares it. The verified digest in
+`references.lock.yaml` then proves the release is the same one. The executor, backend, phase,
+references, and resource envelope are fixed in that snapshot, which is authoritative at runtime.
 
 For a cluster run, replace `--backend local` with `--backend slurm` and supply the partition and
 resource settings for your site. The default background mode prints a task ID:
@@ -233,7 +235,7 @@ Rust submodules use the `rust_build` environment. Each submodule is an independe
 
 ## Naming note
 
-The repository and product name is `otter`. Some source-level command and state symbols are still compatibility-era `xdxtools` names. Documentation distinguishes the current product name from those implementation aliases instead of pretending the rename is complete.
+The repository and product name is `otter`. Some source-level command and state symbols are still compatibility-era `xdxtools` names. Documentation distinguishes the current product name from those implementation aliases.
 
 ## License
 
