@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rainoffallingstar/otter/installer/internal/download"
+	"github.com/otterlab-bio/otter/installer/internal/download"
 )
 
 const (
