@@ -5,6 +5,7 @@ package download
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -136,6 +137,34 @@ func (client *Client) ApplyProxy(url string) string {
 	}
 	prefix := strings.TrimSuffix(client.Proxy, "/")
 	return prefix + "/" + url
+}
+
+// ErrResourceNotFound reports a resource that the host does not have.
+var ErrResourceNotFound = errors.New("resource not found")
+
+// FetchResource retrieves a small text resource such as a parts manifest.
+//
+// It differs from get in two ways that matter for dataset hosts: the proxy prefix is applied,
+// and the GitHub authorization header is not sent, since the resource lives on a different
+// service that would reject an unrelated token.
+func (client *Client) FetchResource(ctx context.Context, url string) ([]byte, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, client.ApplyProxy(url), nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("User-Agent", client.UserAgent)
+	response, err := client.HTTP.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return nil, ErrResourceNotFound
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s: %s", url, response.Status)
+	}
+	return io.ReadAll(response.Body)
 }
 
 func (client *Client) get(ctx context.Context, url string) ([]byte, error) {

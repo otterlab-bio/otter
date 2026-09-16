@@ -142,15 +142,16 @@ func (fetcher *Fetcher) Fetch(ctx context.Context) error {
 				continue
 			}
 			url := fetcher.ArchiveURL(selection, indexType)
-			archive := filepath.Join(staging, ArchiveName(selection, indexType))
 			if fetcher.DryRun {
 				fmt.Printf("  [DRY-RUN] would download %s\n", url)
+				fmt.Printf("  [DRY-RUN] (reassembling parts first if a %s is published)\n", PartsManifestSuffix)
 				fmt.Printf("  [DRY-RUN] would extract %s into %s\n", archivePath, releaseDirectory)
 				continue
 			}
-			fmt.Printf("  fetching %s -> %s\n", url, destination)
-			if err := fetcher.Client.Download(ctx, url, archive); err != nil {
-				return fmt.Errorf("download %s: %w", url, err)
+			fmt.Printf("  fetching %s -> %s\n", archivePath, destination)
+			archive, err := fetcher.fetchPublishedArchive(ctx, selection, indexType, staging)
+			if err != nil {
+				return err
 			}
 			if err := verifyArchiveRoot(ctx, archive); err != nil {
 				return fmt.Errorf("%s: %w", ArchiveName(selection, indexType), err)
