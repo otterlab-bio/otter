@@ -26,8 +26,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_PAT }}
-
       - name: Install test system dependencies
         run: |
           sudo apt-get update
@@ -102,7 +100,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_PAT }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -440,7 +437,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           repository: ${{ env.PUBLIC_RELEASES_REPO }}
-          token: ${{ secrets.SUBMODULES_PAT }}
           tag_name: ${{ steps.meta.outputs.tag }}
           target_commitish: ${{ env.PUBLIC_RELEASES_BRANCH }}
           files: dist/*

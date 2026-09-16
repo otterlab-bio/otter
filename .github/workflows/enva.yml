@@ -26,8 +26,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.SUBMODULES_PAT }}
-
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
