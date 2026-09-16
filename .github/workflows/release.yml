@@ -324,6 +324,10 @@ jobs:
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+          # Explicit rather than inherited: a release left as a draft is invisible, and
+          # releases/latest ignores drafts, so the documented install URL 404s until someone
+          # publishes it by hand — and a later run of this workflow puts it back.
+          draft: false
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           body: |
             ## Release Model
@@ -447,6 +451,7 @@ jobs:
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+          draft: false
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           body: |
             ## Public Mirror
