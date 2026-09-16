@@ -86,6 +86,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Stage commands are executed from a scenario working directory rather than from the
+# invocation directory, so a binary given as a relative path would not resolve. Resolve
+# those here. A bare name is left untouched so a PATH lookup still works.
+for variable_name in otter_binary craftmake_binary stub_registry_binary installer_binary; do
+  variable_value="${!variable_name}"
+  if [[ -n "${variable_value}" && "${variable_value}" == */* ]]; then
+    printf -v "${variable_name}" '%s' \
+      "$(cd "$(dirname "${variable_value}")" && pwd)/$(basename "${variable_value}")"
+  fi
+done
+
 if [[ -z "${otter_binary}" || -z "${craftmake_binary}" ]]; then
   echo "error: --otter and --craftmake are required" >&2
   usage >&2
