@@ -87,12 +87,6 @@ otter → craftmake → enva → operators → bamdriver
 The runtime is intentionally dual-track: production workflows use the Snakemake compatibility path
 while `craftmake`, the native Go execution layer, is integrated and validated alongside it.
 
-## Evidence
-
-Gate 6 evidence covers bounded executor comparison, corrected read/BAM classification, and
-Methx/Methrix scientific parity, with per-scenario detail in the
-[user manual](docs/manual/README.md).
-
 ## Quick start
 
 ### Install a release
@@ -228,10 +222,6 @@ go vet ./...
 ```
 
 Rust submodules use the `rust_build` environment. Each submodule is an independent repository; see its own README for focused build and test commands.
-
-## Naming note
-
-The repository and product name is `otter`. Some source-level command and state symbols are still compatibility-era `xdxtools` names. Documentation distinguishes the current product name from those implementation aliases.
 
 ## License
 

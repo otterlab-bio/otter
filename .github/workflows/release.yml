@@ -2,8 +2,13 @@ name: Release Binaries
 
 on:
   push:
-    branches: [ main ]
+    # Tags only. The daily build is scheduled rather than pushed: a branch filter here made
+    # every commit to main start a full release build, so pushing a commit together with its
+    # tag started two runs for one release.
     tags: [ 'v*.*.*', 'daily-*' ]
+  schedule:
+    # Daily release, so auto mode no longer depends on a push to main.
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       tag:
@@ -326,7 +331,7 @@ jobs:
             - Trigger: push of immutable release tags (`vX.Y.Z` or `vYYYY.MM.DD.N`), push to `main`, or manual dispatch
             - Immutable tags: archival release points that must never move
             - Daily aliases: same-day convenience tags that may be force-updated to the latest build for that UTC date
-            - Auto mode: `main` pushes and manual dispatch without a tag publish/update `daily-YYYYMMDD`
+            - Auto mode: the daily schedule and manual dispatch without a tag publish/update `daily-YYYYMMDD`
             - Policy: strict artifact completeness (missing required binaries => release fails)
 
             ## Linkage
