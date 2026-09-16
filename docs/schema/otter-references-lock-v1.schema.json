@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-references-lock-v1.schema.json",
+  "$id": "https://github.com/rainoffallingstar/otter/docs/schema/otter-references-lock-v1.schema.json",
   "title": "Otter project reference lock v1",
   "type": "object",
   "additionalProperties": false,

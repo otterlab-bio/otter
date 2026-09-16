@@ -16,7 +16,7 @@ A source-built binary may still report compatibility-era `xdxtools` symbols. Che
 Verify the canonical repository and authenticate when assets are private:
 
 ```text
-https://github.com/otterlab-bio/otter
+https://github.com/rainoffallingstar/otter
 ```
 
 Use `GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_PAT` only through the installer's supported environment interface. Never commit tokens or put them in URLs.
@@ -84,7 +84,7 @@ otter run \
   --foreground
 ```
 
-For a canonical v1 run, recover through the immutable snapshot and Craftmake controls described in the [execution contract](../execution-contract.md).
+For a canonical v1 run, recover through the immutable snapshot and Craftmake controls described in the `execution contract`.
 
 ## Why do docs still mention FastQC, Bismark, Methrix, or rMATS?
 

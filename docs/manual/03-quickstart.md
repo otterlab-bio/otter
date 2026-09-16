@@ -41,7 +41,7 @@ otter reference build \
   --fasta /staging/genome.fa.gz --gtf /staging/genes.gtf.gz
 ```
 
-See [reference registry](../reference-registry.md) for the layout, manifest, and checksum contract.
+See `reference registry` for the layout, manifest, and checksum contract.
 
 ### 3. Create the project intent
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-samples-manifest-v1.schema.json",
+  "$id": "https://github.com/rainoffallingstar/otter/docs/schema/otter-samples-manifest-v1.schema.json",
   "title": "Otter samples manifest v1",
   "description": "Tab-separated samples manifest defining input FASTQ pairs for a project. Each row describes one sample with paired-end reads, optional group/batch metadata, and adapter sequences.",
   "type": "object",

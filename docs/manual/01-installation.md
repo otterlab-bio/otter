@@ -14,10 +14,10 @@ This chapter covers release installation, source builds, runtime environments, a
 ## Release installation
 
 The release installer is a statically compiled Go binary published to
-[`otterlab-bio/otter`](https://github.com/otterlab-bio/otter):
+[`rainoffallingstar/otter`](https://github.com/rainoffallingstar/otter):
 
 ```bash
-curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static
+curl -fsSL -o otter-install https://github.com/rainoffallingstar/otter/releases/latest/download/otter-install-linux-amd64-static
 chmod +x otter-install
 ./otter-install
 ```
@@ -25,7 +25,7 @@ chmod +x otter-install
 The legacy shell installer remains available for compatibility:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/otterlab-bio/otter/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/rainoffallingstar/otter/main/scripts/install.sh)
 ```
 
 After installation, verify the selected binary and asset set rather than assuming the latest pre-release is production-qualified:
@@ -39,7 +39,7 @@ command -v otter
 ## Source installation
 
 ```bash
-git clone --recurse-submodules https://github.com/otterlab-bio/otter.git
+git clone --recurse-submodules https://github.com/rainoffallingstar/otter.git
 cd otter
 conda activate go-env
 go build -o otter .

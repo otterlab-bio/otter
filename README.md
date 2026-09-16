@@ -59,7 +59,7 @@ selection resolves to `manifest sha256:33dfd7d4ec0a90c6e11fdc45d02b2d4e9b6d82e4a
 recorded with its compute-node verification in the Gate 6 operations record.
 
 <p align="center">
-  <img src="./docs/otter-workflow-stack.svg" width="100%" alt="Otter workflow stack from project control through Craftmake, Enva, domain operators, and Bamdriver">
+  <img src="./figs/otter-workflow-stack.svg" width="100%" alt="Otter workflow stack from project control through Craftmake, Enva, domain operators, and Bamdriver">
 </p>
 
 ## What you can do
@@ -91,7 +91,7 @@ while `craftmake`, the native Go execution layer, is integrated and validated al
 
 Gate 6 evidence covers bounded executor comparison, corrected read/BAM classification, and
 Methx/Methrix scientific parity, with per-scenario detail in the
-[workflow catalog](docs/workflow-catalog.md).
+[user manual](docs/manual/README.md).
 
 ## Quick start
 
@@ -213,14 +213,10 @@ resolve it first (see [reference migration](docs/manual/08-reference-migration.m
 
 ## Documentation
 
-- [Documentation hub](docs/README.md) — current contracts, tutorials, operations, and historical evidence map.
 - [User manual](docs/manual/README.md) — installation, data preparation, quick start, modes, advanced usage, components, and FAQ.
-- [Architecture](docs/architecture.md) — system boundaries and migration model.
-- [Workflow catalog](docs/workflow-catalog.md) — scenarios, phases, artifacts, and comparison ownership.
-- [Configuration and run snapshots](docs/configuration.md) — legacy and canonical configuration models.
-- [Installation](docs/installation.md) — release, source, environment, and troubleshooting details.
-- [Build and submodules](docs/build.md) · [submodule build guide](docs/submodules-build-guide.md).
-- [Release readiness](docs/release-readiness.md) — current release checklist and deferred evidence boundary.
+- [Documentation index](docs/README.md) — entry point for the manual, examples, and schemas.
+- [Worked examples](docs/examples/) — complete project configurations.
+- [Schemas](docs/schema/) — configuration and manifest schemas.
 - [Methx → native Methrix HDF5 exporter](methx/scripts/export_methrix_hdf5.R) — R-side interoperability path.
 
 ## Development

@@ -69,9 +69,9 @@ migrate and resolve it first (see [chapter 8](08-reference-migration.md)).
 - Linux or macOS for local development; Linux with SLURM is the primary production target.
 - Paired FASTQ files and a matching pdata file for `create`.
 - A reference registry release for the selected scenario, addressed as
-  `<id>@<release>` (see [reference registry](../reference-registry.md)).
+  `<id>@<release>` (see `reference registry`).
 - A site profile when the machine is not the default target; generate one with
-  `otter site generate` (see [site profiles](../site-profiles.md)).
+  `otter site generate` (see `site profiles`).
 - `otter-snakemake` for the Snakemake compatibility path.
 - `enva` and the managed runtime environments when using the release workflow setup.
 

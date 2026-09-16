@@ -55,7 +55,7 @@ otter → craftmake → enva → 算子 → bamdriver
 
 ## 证据与发布边界
 
-Gate 6 已接受的范围包括有界 executor 比较、校正后的 read/BAM 分类证据，以及 Methx/Methrix 科学 parity。它**不**代表生产规模吞吐已获批准、不代表新的七输入 legacy-equivalent matrix 已完成、不代表 WGBS 已完成完整资格认证，也不代表 Snakemake 已被普遍替换。详见[工作流目录](docs/workflow-catalog.md)和 [Gate 6 证据登记表](docs/gate6-closeout-evidence-register.json)。
+Gate 6 已接受的范围包括有界 executor 比较、校正后的 read/BAM 分类证据，以及 Methx/Methrix 科学 parity。它**不**代表生产规模吞吐已获批准、不代表新的七输入 legacy-equivalent matrix 已完成、不代表 WGBS 已完成完整资格认证，也不代表 Snakemake 已被普遍替换。详见`工作流目录`和 `Gate 6 证据登记表`。
 
 ## 快速上手
 
@@ -149,12 +149,12 @@ otter run \
 
 - [文档中心](docs/README.md)：当前契约、教程、运维和历史证据地图。
 - [用户手册](docs/manual/README.md)：安装、数据准备、快速上手、分析模式、高级用法、组件和 FAQ。
-- [架构](docs/architecture.md)
-- [工作流目录](docs/workflow-catalog.md)
-- [配置与 run snapshot](docs/configuration.md)
-- [安装](docs/installation.md)
-- [构建与子仓库](docs/build.md) · [子模块构建指南](docs/submodules-build-guide.md)
-- [发布准备](docs/release-readiness.md)：当前发布清单与延期证据边界
+- `架构`
+- `工作流目录`
+- `配置与 run snapshot`
+- `安装`
+- `构建与子仓库` · `子模块构建指南`
+- `发布准备`：当前发布清单与延期证据边界
 - [Methx → 原生 Methrix HDF5 转换函数](methx/scripts/export_methrix_hdf5.R)
 
 ## 开发

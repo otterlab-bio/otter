@@ -10,56 +10,56 @@ This directory is the source of truth for current user-facing contracts, operati
 
 | Need | Read |
 | --- | --- |
-| Understand the product | [Project overview](project-overview.md) |
-| Install a release or source checkout | [Installation](installation.md) |
+| Understand the product | `Project overview` |
+| Install a release or source checkout | `Installation` |
 | Run a first workflow | [User manual](manual/README.md) |
-| Understand the execution stack | [Architecture](architecture.md) |
-| Choose a workflow scenario | [Workflow catalog](workflow-catalog.md) |
-| Resolve canonical files into an immutable run | [Configuration](configuration.md), [execution contract](execution-contract.md) |
-| Configure sites and references | [Site profiles](site-profiles.md), [reference registry](reference-registry.md) |
-| Build the root or submodules | [Build guide](build.md), [submodule build guide](submodules-build-guide.md) |
-| Understand release readiness | [Release readiness](release-readiness.md) |
-| Understand accepted Gate 6 evidence | [Gate 6 comparison](gate6-toolchain-comparison-report.md), [evidence register](gate6-closeout-evidence-register.json) |
+| Understand the execution stack | `Architecture` |
+| Choose a workflow scenario | `Workflow catalog` |
+| Resolve canonical files into an immutable run | `Configuration`, `execution contract` |
+| Configure sites and references | `Site profiles`, `reference registry` |
+| Build the root or submodules | `Build guide`, `submodule build guide` |
+| Understand release readiness | `Release readiness` |
+| Understand accepted Gate 6 evidence | `Gate 6 comparison`, `evidence register` |
 
 ## Current documentation layers
 
 ### Product and user guidance
 
-- [Project overview](project-overview.md) — product hierarchy, current/target runtime, scenarios, and repository layout.
-- [Installation](installation.md) — release/source install, environments, verification, and troubleshooting.
+- `Project overview` — product hierarchy, current/target runtime, scenarios, and repository layout.
+- `Installation` — release/source install, environments, verification, and troubleshooting.
 - [User manual](manual/README.md) — task-oriented tutorial sequence for new users.
-- [Requirements](requirements.md) — current product requirements and boundaries.
+- `Requirements` — current product requirements and boundaries.
 
 ### Contracts and reference
 
-- [Architecture](architecture.md)
-- [Configuration](configuration.md)
-- [Execution contract](execution-contract.md)
-- [Project layout](project-layout.md)
-- [Site profiles](site-profiles.md)
-- [Reference registry](reference-registry.md)
+- `Architecture`
+- `Configuration`
+- `Execution contract`
+- `Project layout`
+- `Site profiles`
+- `Reference registry`
 - [Reference migration](manual/08-reference-migration.md)
-- [Workflow catalog](workflow-catalog.md)
+- `Workflow catalog`
 - [Schema directory](schema/)
 
 ### Engineering and operations
 
-- [Build guide](build.md)
-- [Submodule build guide](submodules-build-guide.md)
-- [Benchmark plan](benchmark-plan.md)
-- [Paracloud operations](gate6-paracloud-operations.md)
+- `Build guide`
+- `Submodule build guide`
+- `Benchmark plan`
+- `Paracloud operations`
 - [Offline e2e rehearsal](../scripts/e2e/otter_e2e.sh) — the `init → create → config resolve → run` chain, the site-profile leg, and the executor pairing contract, run without network access.
 - [Otter repository skill](../skills/otter/SKILL.md) — repository boundaries, toolchain matrix, validation strategy, and safe operating rules.
 - [Craftmake workflow skill](../skills/craftmake/SKILL.md) — controller usage, YAML workflow authoring, and compatibility boundaries.
 
 ### Evidence and project decisions
 
-- [Current context](active_context.md) — compact current-state handoff.
-- [Gate 6 evidence register](gate6-closeout-evidence-register.json) — machine-readable acceptance boundary.
-- [Gate 6 comparison report](gate6-toolchain-comparison-report.md) — accepted parity and limitation summary.
-- [Review index](review/README.md) — dated reviews and remediation evidence.
-- [Archive](archive/) — historical implementation records retained as evidence.
-- [Notes](notes/) — dated execution handoffs and working records.
+- `Current context` — compact current-state handoff.
+- `Gate 6 evidence register` — machine-readable acceptance boundary.
+- `Gate 6 comparison report` — accepted parity and limitation summary.
+- `Review index` — dated reviews and remediation evidence.
+- `Archive` — historical implementation records retained as evidence.
+- `Notes` — dated execution handoffs and working records.
 
 ## Documentation rules
 
