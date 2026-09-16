@@ -1,0 +1,84 @@
+name: BeaverPDX step1
+version: 1
+on:
+  otter:
+    workflow: BeaverPDX
+    phase: step1
+    modes: [RRBS, WGBS, BSSEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  fastqc_before:
+    name: FastQC before trimming
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      read1: "${{ config.output.raw_dir }}/${{ sample.id }}_R1.fastq.gz"
+      read2: "${{ config.output.raw_dir }}/${{ sample.id }}_R2.fastq.gz"
+    outputs:
+      read1_data: "${{ config.directories.qc.before }}/${{ sample.id }}_R1_fastqcx/fastqc_data.txt"
+      read2_data: "${{ config.directories.qc.before }}/${{ sample.id }}_R2_fastqcx/fastqc_data.txt"
+    resources:
+      cores: 2
+      memory: 4G
+      partition: amd_512
+    steps:
+      - name: Run FastQC before trimming
+        run: |
+          mkdir -p "$(dirname '${{ outputs.read1_data }}')" "$(dirname '${{ outputs.read2_data }}')"
+          fastqcx -q '${{ inputs.read1 }}' -s '${{ config.directories.qc.before }}/${{ sample.id }}_R1_fastqcx' --no-html
+          fastqcx -q '${{ inputs.read2 }}' -s '${{ config.directories.qc.before }}/${{ sample.id }}_R2_fastqcx' --no-html
+
+  trim_reads:
+    name: Trim paired reads
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      read1: "${{ config.output.raw_dir }}/${{ sample.id }}_R1.fastq.gz"
+      read2: "${{ config.output.raw_dir }}/${{ sample.id }}_R2.fastq.gz"
+    outputs:
+      read1: "${{ config.output.trim_dir }}/${{ sample.id }}_val_1.fq.gz"
+      read2: "${{ config.output.trim_dir }}/${{ sample.id }}_val_2.fq.gz"
+      read1_report: "${{ config.output.trim_dir }}/${{ sample.id }}_R1.fastq.gz_trimming_report.txt"
+      read2_report: "${{ config.output.trim_dir }}/${{ sample.id }}_R2.fastq.gz_trimming_report.txt"
+    resources:
+      cores: 6
+      memory: 8G
+      partition: amd_512
+    steps:
+      - name: Run Trim Galore
+        run: |
+          mkdir -p '${{ config.output.trim_dir }}'
+          command=(trim_galore -e '${{ config.workflow.adapters.error }}' -j '${{ resources.cores }}' --basename '${{ sample.id }}' --paired -o '${{ config.output.trim_dir }}')
+          if [ '${{ sample.adapter1 }}' != 'AUTO' ] && [ '${{ sample.adapter1 }}' != 'NO_ADAPTER_CAL_USE_DEFAULT' ]; then command+=(--adapter '${{ sample.adapter1 }}'); fi
+          if [ '${{ sample.adapter2 }}' != 'AUTO' ] && [ '${{ sample.adapter2 }}' != 'NO_ADAPTER_CAL_USE_DEFAULT' ]; then command+=(--adapter2 '${{ sample.adapter2 }}'); fi
+          command+=('${{ inputs.read1 }}' '${{ inputs.read2 }}')
+          "${command[@]}"
+
+  fastqc_after:
+    name: FastQC after trimming
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      read1: "${{ jobs.trim_reads.outputs.read1 }}"
+      read2: "${{ jobs.trim_reads.outputs.read2 }}"
+    outputs:
+      read1_data: "${{ config.directories.qc.after }}/${{ sample.id }}_val_1_fastqcx/fastqc_data.txt"
+      read2_data: "${{ config.directories.qc.after }}/${{ sample.id }}_val_2_fastqcx/fastqc_data.txt"
+    resources:
+      cores: 2
+      memory: 4G
+      partition: amd_512
+    steps:
+      - name: Run FastQC after trimming
+        run: |
+          mkdir -p "$(dirname '${{ outputs.read1_data }}')" "$(dirname '${{ outputs.read2_data }}')"
+          fastqcx -q '${{ inputs.read1 }}' -s '${{ config.directories.qc.after }}/${{ sample.id }}_val_1_fastqcx' --no-html
+          fastqcx -q '${{ inputs.read2 }}' -s '${{ config.directories.qc.after }}/${{ sample.id }}_val_2_fastqcx' --no-html
+

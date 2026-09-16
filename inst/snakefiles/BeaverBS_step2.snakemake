@@ -1,0 +1,26 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_{species}.bam"), sample=SIDs,species = species) ,
+    expand(os.path.join(config["outdir_qualimap"],"{sample}_{species}","qualimapReport.html") , sample=SIDs,species = species),
+    expand(os.path.join(config["directories"]["qc"]["main"],"GCbias","{sample}_{species}", "gc_bias_metrics.txt"),sample=SIDs,species = species),
+    expand(os.path.join(config["directories"]["qc"]["main"],"GCbias","{sample}_{species}", "gc_bias_metrics.pdf"),sample=SIDs,species = species),
+    expand(os.path.join(config["directories"]["qc"]["main"],"GCbias","{sample}_{species}", "summary_metrics.txt"),sample=SIDs,species = species)
+
+
+
+# bsmap2sort
+
+include: "rules/04bsmap2sort_bismark.smk"
+
+# qualimap
+
+include:"rules/05-3-qualimap.smk"
+
+# GCbias
+
+include:"rules/collectGCbias.smk"

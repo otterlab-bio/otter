@@ -1,0 +1,22 @@
+.git
+.github
+.gitmodules
+
+# Build outputs and caches
+**/target
+**/dist
+**/bin
+**/*.o
+**/*.a
+**/*.so
+**/*.dylib
+**/*.dll
+
+# Python/Conda caches
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+
+# Local runtime data
+userspace
+otter-runtime

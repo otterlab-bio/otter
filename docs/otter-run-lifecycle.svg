@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">Otter run lifecycle</title>
+  <desc id="desc">A six-step lifecycle from project intent and samples through immutable run resolution, execution, validation, and published evidence.</desc>
+  <rect width="1200" height="420" rx="24" fill="#f6f3ed"/>
+  <text x="56" y="54" fill="#183047" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="700" letter-spacing="2">FROM PROJECT INTENT TO CHECKED ARTIFACTS</text>
+  <text x="56" y="102" fill="#183047" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="36" font-weight="700">One run, one identity, one evidence trail.</text>
+  <text x="56" y="134" fill="#5e6d7d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17">Resolve choices before execution; publish only what the run can prove.</text>
+  <path d="M116 230H1084" stroke="#c6d0d8" stroke-width="4"/>
+  <path d="M253 230H283M413 230H443M573 230H603M733 230H763M893 230H923" stroke="#2b9e9a" stroke-width="4"/>
+  <path d="M276 222L288 230L276 238M436 222L448 230L436 238M596 222L608 230L596 238M756 222L768 230L756 238M916 222L928 230L916 238" fill="none" stroke="#2b9e9a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <circle cx="116" cy="230" r="28" fill="#183047"/>
+    <text x="116" y="238" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">01</text>
+    <text x="116" y="292" text-anchor="middle" fill="#183047" font-size="18" font-weight="700">Intent</text>
+    <text x="116" y="318" text-anchor="middle" fill="#5e6d7d" font-size="14">project.yaml</text>
+    <text x="116" y="338" text-anchor="middle" fill="#5e6d7d" font-size="14">workflow choice</text>
+
+    <circle cx="276" cy="230" r="28" fill="#183047"/>
+    <text x="276" y="238" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">02</text>
+    <text x="276" y="292" text-anchor="middle" fill="#183047" font-size="18" font-weight="700">Inputs</text>
+    <text x="276" y="318" text-anchor="middle" fill="#5e6d7d" font-size="14">samples.tsv</text>
+    <text x="276" y="338" text-anchor="middle" fill="#5e6d7d" font-size="14">references.lock</text>
+
+    <circle cx="436" cy="230" r="28" fill="#2b9e9a"/>
+    <text x="436" y="238" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">03</text>
+    <text x="436" y="292" text-anchor="middle" fill="#183047" font-size="18" font-weight="700">Resolve</text>
+    <text x="436" y="318" text-anchor="middle" fill="#5e6d7d" font-size="14">run.yaml</text>
+    <text x="436" y="338" text-anchor="middle" fill="#5e6d7d" font-size="14">digests + resources</text>
+
+    <circle cx="596" cy="230" r="28" fill="#2b9e9a"/>
+    <text x="596" y="238" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">04</text>
+    <text x="596" y="292" text-anchor="middle" fill="#183047" font-size="18" font-weight="700">Execute</text>
+    <text x="596" y="318" text-anchor="middle" fill="#5e6d7d" font-size="14">Craftmake or</text>
+    <text x="596" y="338" text-anchor="middle" fill="#5e6d7d" font-size="14">Snakemake compat.</text>
+
+    <circle cx="756" cy="230" r="28" fill="#2b9e9a"/>
+    <text x="756" y="238" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">05</text>
+    <text x="756" y="292" text-anchor="middle" fill="#183047" font-size="18" font-weight="700">Verify</text>
+    <text x="756" y="318" text-anchor="middle" fill="#5e6d7d" font-size="14">manifest</text>
+    <text x="756" y="338" text-anchor="middle" fill="#5e6d7d" font-size="14">checksums</text>
+
+    <circle cx="916" cy="230" r="28" fill="#e18b4c"/>
+    <text x="916" y="238" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="700">06</text>
+    <text x="916" y="292" text-anchor="middle" fill="#183047" font-size="18" font-weight="700">Publish</text>
+    <text x="916" y="318" text-anchor="middle" fill="#5e6d7d" font-size="14">results/</text>
+    <text x="916" y="338" text-anchor="middle" fill="#5e6d7d" font-size="14">auditable evidence</text>
+  </g>
+
+  <rect x="1010" y="188" width="134" height="84" rx="12" fill="#183047"/>
+  <text x="1077" y="218" text-anchor="middle" fill="#9de5da" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">resume</text>
+  <text x="1077" y="242" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">same run ID</text>
+  <text x="1077" y="262" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">new run for changes</text>
+
+  <rect x="56" y="372" width="1088" height="2" fill="#d8d0c4"/>
+  <text x="56" y="400" fill="#5e6d7d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15">The snapshot freezes executor, backend, references, inputs, workflow assets, and resource envelopes before work begins.</text>
+</svg>

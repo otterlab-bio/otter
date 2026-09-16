@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://otter.dev/schema/otter-artifacts-v1.schema.json",
+  "title": "Otter Artifact Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "run_snapshot_digest",
+    "scenario",
+    "toolchain",
+    "executor",
+    "backend",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "otter.artifacts/v1"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run-[0-9]{8}T[0-9]{6}Z-[a-z]{6}$"
+    },
+    "run_snapshot_digest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "scenario": {
+      "enum": ["rrbs", "wgbs", "rnaseq", "bs-pdx", "rna-pdx"]
+    },
+    "toolchain": {
+      "enum": ["modern", "legacy-equivalent"]
+    },
+    "executor": {
+      "enum": ["craftmake", "snakemake"]
+    },
+    "backend": {
+      "enum": ["local", "slurm"]
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "media_type", "schema", "checksum", "comparison"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checksum": {
+          "$ref": "#/$defs/sha256"
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        }
+      }
+    },
+    "artifact_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "media_type", "schema", "comparison"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier", "comparator"],
+      "properties": {
+        "tier": {
+          "enum": ["exact", "structural", "scientific", "informational"]
+        },
+        "comparator": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

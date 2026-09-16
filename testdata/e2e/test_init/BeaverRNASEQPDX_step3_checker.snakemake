@@ -1,0 +1,21 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_{species}.bam"), sample=SIDs,species = species) ,
+    expand(os.path.join(config["outdir_qualimap"],"{sample}_{species}","qualimapReport.html") , sample=SIDs,species = species) ,
+    expand(os.path.join(config["outDir_mCall"], "{sample}_"+config["graft"]+".txt"), sample=SIDs),
+    os.path.join(config["outDir_betaM"], "matrix_count.txt"),
+    os.path.join(config["outDir_betaM"], "matrix_norm.txt"),
+    os.path.join(config["qc_summary"],"qc_summary.txt")
+
+# construct matrix
+
+include:"rules/rnaseq_matrix.smk"
+
+# qc summary
+
+include:"rules/rna_qc_summary.smk"

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://otter.dev/schema/otter-artifact-declarations-v1.schema.json",
+  "title": "Otter Artifact Declaration Document v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifacts"],
+  "properties": {
+    "schema_version": {
+      "const": "otter.artifact-declarations/v1"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "otter-artifacts-v1.schema.json#/$defs/artifact_declaration"
+      }
+    }
+  }
+}

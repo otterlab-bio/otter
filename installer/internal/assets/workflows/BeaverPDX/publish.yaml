@@ -1,0 +1,192 @@
+name: BeaverPDX publish
+version: 1
+on:
+  otter:
+    workflow: BeaverPDX
+    phase: publish
+    modes: [RRBS, WGBS, BSSEQ]
+defaults:
+  shell: bash
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  publish_artifacts:
+    name: Publish immutable BeaverPDX artifacts
+    scope: global
+    dimensions: []
+    inputs:
+      filtered_bam_directory: "${{ config.directories.bsmap.main }}/Filtered_bams"
+      methrix_data: "${{ config.directories.methylation_call }}/methrixh5/methrix_data.h5"
+      bismark_summary: "${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}/bismark_summary_report.html"
+      qc_summary: "${{ config.directories.qc_summary }}/qc_summary.xlsx"
+    outputs:
+      classification_summary: "${{ paths.results }}/pdx/graft/classification.tsv"
+      methrix_data: "${{ paths.results }}/methylation/methrix_data.h5"
+      bismark_summary: "${{ paths.results }}/pdx/graft/bismark_summary_report.html"
+      declarations: "${{ paths.work }}/publish/beaverpdx-artifacts.json"
+      manifest: "${{ paths.results }}/artifacts.json"
+    resources:
+      cores: 1
+      memory: 1G
+      partition: amd_512
+    steps:
+      - name: Stage and publish checked PDX results
+        run: |
+          results_root='${{ paths.results }}'
+          staging_parent="$results_root/.publish-staging"
+          declaration_path='${{ outputs.declarations }}'
+          manifest_path='${{ outputs.manifest }}'
+          filtered_directory='${{ inputs.filtered_bam_directory }}'
+          final_graft_directory="$results_root/pdx/graft"
+          final_methylation_directory="$results_root/methylation"
+          otter_cli="${OTTER:-otter}"
+          shopt -s nullglob
+          filtered_bams=("$filtered_directory"/*_Filtered.bam)
+          if [ "${#filtered_bams[@]}" -eq 0 ]; then
+            printf 'No graft filtered BAMs were found in %s\n' "$filtered_directory" >&2
+            exit 1
+          fi
+          if [ -e "$manifest_path" ]; then
+            "$otter_cli" artifact verify '${{ paths.config }}'
+            exit 0
+          fi
+
+          mkdir -p "$staging_parent" "$(dirname "$declaration_path")"
+          staging_root="$(mktemp -d "$staging_parent/bs-pdx.XXXXXX")"
+          trap 'rm -rf "$staging_root"' EXIT
+          staging_graft_directory="$staging_root/pdx/graft"
+          staging_methylation_directory="$staging_root/methylation"
+          mkdir -p "$staging_graft_directory" "$staging_methylation_directory"
+          classification_summary="$staging_graft_directory/classification.tsv"
+          printf 'artifact_index\tsource_bam\tsource_bai\tmapped_reads\n' > "$classification_summary"
+
+          artifact_index=0
+          for source_bam in "${filtered_bams[@]}"; do
+            source_bai="${source_bam}.bai"
+            if [ ! -s "$source_bam" ] || [ ! -s "$source_bai" ]; then
+              printf 'Missing non-empty filtered BAM/BAI pair: %s and %s\n' "$source_bam" "$source_bai" >&2
+              exit 1
+            fi
+            samtools quickcheck -v "$source_bam"
+            artifact_index=$((artifact_index + 1))
+            target_bam="$staging_graft_directory/$(basename "$source_bam")"
+            target_bai="${target_bam}.bai"
+            cp -- "$source_bam" "$target_bam"
+            cp -- "$source_bai" "$target_bai"
+            samtools quickcheck -v "$target_bam"
+            mapped_reads="$(samtools view -c -F 4 "$target_bam")"
+            if [ "$mapped_reads" -le 0 ]; then
+              printf 'Filtered graft BAM has no mapped reads: %s\n' "$target_bam" >&2
+              exit 1
+            fi
+            printf '%04d\t%s\t%s\t%s\n' "$artifact_index" "$(basename "$target_bam")" "$(basename "$target_bai")" "$mapped_reads" >> "$classification_summary"
+          done
+          cp -- '${{ inputs.bismark_summary }}' "$staging_graft_directory/bismark_summary_report.html"
+          cp -- '${{ inputs.methrix_data }}' "$staging_methylation_directory/methrix_data.h5"
+          test -s "$staging_graft_directory/bismark_summary_report.html"
+          test -s "$staging_methylation_directory/methrix_data.h5"
+
+          python - "$declaration_path" "$staging_graft_directory" <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          declaration_path = pathlib.Path(sys.argv[1])
+          graft_directory = pathlib.Path(sys.argv[2])
+          artifact_entries = []
+          for artifact_index, bam_path in enumerate(sorted(graft_directory.glob("*_Filtered.bam")), start=1):
+              bai_path = pathlib.Path(str(bam_path) + ".bai")
+              if not bai_path.is_file():
+                  raise SystemExit(f"missing staged BAM index: {bai_path}")
+              artifact_entries.extend([
+                  {
+                      "id": f"graft-alignment-bam-{artifact_index:04d}",
+                      "path": f"pdx/graft/{bam_path.name}",
+                      "media_type": "application/x-bam",
+                      "schema": "sam-bam/v1",
+                      "comparison": {"tier": "structural", "comparator": "bam-pair-structure/v1"},
+                  },
+                  {
+                      "id": f"graft-alignment-bai-{artifact_index:04d}",
+                      "path": f"pdx/graft/{bai_path.name}",
+                      "media_type": "application/x-bam-index",
+                      "schema": "sam-bai/v1",
+                      "comparison": {"tier": "structural", "comparator": "bam-pair-structure/v1"},
+                  },
+              ])
+          artifact_entries.extend([
+              {
+                  "id": "graft-classification-summary",
+                  "path": "pdx/graft/classification.tsv",
+                  "media_type": "text/tab-separated-values",
+                  "schema": "otter.pdx-graft-classification/v1",
+                  "comparison": {"tier": "scientific", "comparator": "pdx-graft-read-counts/v1"},
+              },
+              {
+                  "id": "methylation-matrix",
+                  "path": "methylation/methrix_data.h5",
+                  "media_type": "application/x-hdf5",
+                  "schema": "methrix-se/v1",
+                  "comparison": {"tier": "scientific", "comparator": "methrix-semantics/v1"},
+              },
+              {
+                  "id": "graft-bismark-summary",
+                  "path": "pdx/graft/bismark_summary_report.html",
+                  "media_type": "text/html",
+                  "schema": "otter.bismark-summary/v1",
+                  "comparison": {"tier": "informational", "comparator": "bismark-summary/v1"},
+              },
+              {
+                  "id": "qc-summary",
+                  "path": "qc/qc_summary.xlsx",
+                  "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  "schema": "otter.qc-summary/v1",
+                  "comparison": {"tier": "structural", "comparator": "xlsx-structure/v1"},
+              },
+          ])
+          temporary_path = declaration_path.with_suffix(declaration_path.suffix + ".tmp")
+          temporary_path.write_text(json.dumps({
+              "schema_version": "otter.artifact-declarations/v1",
+              "artifacts": artifact_entries,
+          }, indent=2) + "\n", encoding="utf-8")
+          os.replace(temporary_path, declaration_path)
+          PY
+
+          publish_directory() {
+            local staged_directory="$1"
+            local published_directory="$2"
+            if [ -e "$published_directory" ]; then
+              python - "$staged_directory" "$published_directory" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          def digest_tree(root):
+              entries = []
+              for candidate in sorted(root.rglob("*")):
+                  if candidate.is_symlink() or not candidate.is_file():
+                      if candidate.is_dir():
+                          continue
+                      raise SystemExit(f"published PDX tree contains a non-regular file: {candidate}")
+                  entries.append((candidate.relative_to(root).as_posix(), hashlib.sha256(candidate.read_bytes()).hexdigest()))
+              return entries
+
+          if digest_tree(pathlib.Path(sys.argv[1])) != digest_tree(pathlib.Path(sys.argv[2])):
+              raise SystemExit("existing PDX publication differs from the staged retry payload")
+          PY
+            else
+              mkdir -p "$(dirname "$published_directory")"
+              mv "$staged_directory" "$published_directory"
+            fi
+          }
+          publish_directory "$staging_graft_directory" "$final_graft_directory"
+          publish_directory "$staging_methylation_directory" "$final_methylation_directory"
+
+          "$otter_cli" artifact publish '${{ paths.config }}' "$declaration_path"
+          test -f "$manifest_path"
+          test "$(stat -c '%a' "$manifest_path")" = 444
+          "$otter_cli" artifact verify '${{ paths.config }}'

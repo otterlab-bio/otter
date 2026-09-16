@@ -1,0 +1,79 @@
+name: Enva CI
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - '.github/workflows/enva.yml'
+      - 'enva/**'
+      - 'scripts/test_enva_e2e.sh'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - '.github/workflows/enva.yml'
+      - 'enva/**'
+      - 'scripts/test_enva_e2e.sh'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  enva-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT }}
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: enva -> target
+
+      # This step intentionally installs external micromamba to exercise enva's
+      # advertised compatibility-layer behavior (duplicate external prefixes and the
+      # interactive remove flow). It is an enva feature test, not a scientific analysis
+      # pipeline; OTTER scientific workflows use enva only.
+      - name: Install micromamba for compatibility-layer e2e
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          download-micromamba: true
+          generate-run-shell: false
+          cache-downloads: false
+          micromamba-binary-path: ${{ runner.temp }}/bin/micromamba
+          post-cleanup: none
+
+      - name: Run enva unit tests
+        working-directory: enva
+        run: cargo test
+
+      - name: Build enva debug binary
+        working-directory: enva
+        run: cargo build
+
+      - name: Run enva end-to-end tests including interactive remove flow
+        env:
+          MICROMAMBA_BIN: ${{ runner.temp }}/bin/micromamba
+        run: |
+          python3 --version
+          bash scripts/test_enva_e2e.sh
+
+      - name: Job summary
+        if: always()
+        continue-on-error: true
+        run: |
+          bash scripts/ci/job-summary.sh \
+            --verdict "${{ job.status }}" \
+            --title "OTTER — enva integration test" \
+            --checked "Installs a real package manager on the runner and exercises enva against it: unit tests, a debug build, and the end-to-end suite including the interactive remove flow." \
+            --check "enva unit tests|cargo test passes|see step log|-" \
+            --check "enva debug build|cargo build succeeds|see step log|-" \
+            --check "End-to-end suite incl. interactive remove|test_enva_e2e.sh passes|see step log|-" \
+            --metric "Package manager backend|micromamba downloaded at run time" \
+            --limit "Integration coverage of the enva CLI against one external package manager. It does not assert the solvability of every shipped environment definition; enva's own E2E matrix does that per environment."

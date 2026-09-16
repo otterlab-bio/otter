@@ -1,0 +1,45 @@
+[project]
+name = "Rscripts"
+r_version = "4.4"
+description = ""
+authors = []
+keywords = []
+suggests = []
+dependencies = [
+    "BSgenome",
+    "BiocParallel",
+    "XenofilteR",
+    "blastula",
+    "data.table",
+    "dplyr",
+    "fs",
+    "glue",
+    "methrix",
+    "openxlsx",
+    "optparse",
+    "readr",
+    "stringr",
+    "tibble",
+    "tidyr",
+    "yaml",
+]
+dev_dependencies = []
+prefer_repositories_for = []
+conda_env = "otter-r"
+pak_fallback = true
+
+[[project.repositories]]
+alias = "posit"
+url = "https://packagemanager.posit.co/cran/latest"
+force_source = true
+
+[[project.repositories]]
+alias = "bioc"
+url = "https://bioconductor.org/packages/release/bioc"
+force_source = true
+
+[project.urls]
+
+[project.packages_env_vars]
+
+[project.configure_args]

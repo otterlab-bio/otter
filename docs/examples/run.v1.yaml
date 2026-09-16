@@ -1,0 +1,114 @@
+schema_version: otter.run/v1
+
+run:
+  id: run-20260726T013245Z-kxqjrm
+  created_at: "2026-07-26T01:32:45Z"
+  immutable: true
+
+project:
+  id: cohort-a
+  root: /shared/projects/cohort-a
+
+workflow:
+  scenario: rrbs
+  toolchain: modern
+  legacy_extensions: []
+  asset_root: /shared/projects/cohort-a/workflows
+
+execution:
+  executor:
+    value: craftmake
+    source: default
+  backend:
+    value: slurm
+    source: detection
+    evidence:
+      cluster: production
+      commands: [sbatch, squeue, sacct, scancel]
+  site:
+    value: production-cluster
+    source: detection
+  resources: {}
+  slurm:
+    partition:
+      value: compute
+      source: profile
+    account:
+      value: genomics
+      source: profile
+    qos:
+      value: normal
+      source: profile
+    max_jobs:
+      value: 64
+      source: profile
+    default_time:
+      value: "24:00:00"
+      source: profile
+    scratch_root:
+      value: /scratch/otter
+      source: profile
+
+samples:
+  - id: S01
+    r1: /shared/projects/cohort-a/data/S01_R1.fastq.gz
+    r2: /shared/projects/cohort-a/data/S01_R2.fastq.gz
+    group: case
+    batch: B1
+    adapter_r1: AUTO
+    adapter_r2: AUTO
+    r1_sha256: sha256:9999999999999999999999999999999999999999999999999999999999999999
+    r1_size_bytes: 1024
+    r2_sha256: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    r2_size_bytes: 1024
+
+references:
+  project_selection:
+    primary: hg38@GRCh38.p14
+  effective_selection:
+    primary: hg38@GRCh38.p14
+  override: false
+  override_source: none
+  resolved:
+    - role: primary
+      id: hg38
+      release: GRCh38.p14
+      registry_root: /shared/otter/references/genomes/hg38/GRCh38.p14
+      manifest_digest: sha256:5555555555555555555555555555555555555555555555555555555555555555
+      fasta:
+        type: fasta
+        path: /shared/otter/references/genomes/hg38/GRCh38.p14/fasta/genome.fa.gz
+        sha256: sha256:1111111111111111111111111111111111111111111111111111111111111111
+      annotations:
+        - type: gtf
+          path: /shared/otter/references/genomes/hg38/GRCh38.p14/annotations/gencode.v44.gtf.gz
+          sha256: sha256:2222222222222222222222222222222222222222222222222222222222222222
+      indexes:
+        - type: bismark
+          path: /shared/otter/references/genomes/hg38/GRCh38.p14/indexes/bismark
+          sha256: sha256:3333333333333333333333333333333333333333333333333333333333333333
+
+paths:
+  run_root: /shared/projects/cohort-a/runs/run-20260726T013245Z-kxqjrm
+  work: /shared/projects/cohort-a/runs/run-20260726T013245Z-kxqjrm/work
+  results: /shared/projects/cohort-a/runs/run-20260726T013245Z-kxqjrm/results
+  logs: /shared/projects/cohort-a/runs/run-20260726T013245Z-kxqjrm/logs
+  state: /shared/projects/cohort-a/runs/run-20260726T013245Z-kxqjrm/state
+  metrics: /shared/projects/cohort-a/runs/run-20260726T013245Z-kxqjrm/metrics
+  project_config: /shared/projects/cohort-a/project.yaml
+  samples_manifest: /shared/projects/cohort-a/samples.tsv
+  references_lock: /shared/projects/cohort-a/references.lock.yaml
+  workflow_assets:
+    - /shared/projects/cohort-a/workflows
+    - /shared/projects/cohort-a/rules
+    - /shared/projects/cohort-a/environments
+    - /shared/projects/cohort-a/schemas
+    - /shared/projects/cohort-a/project.lock.yaml
+
+digests:
+  project: sha256:6666666666666666666666666666666666666666666666666666666666666666
+  samples: sha256:7777777777777777777777777777777777777777777777777777777777777777
+  workflow_assets: sha256:8888888888888888888888888888888888888888888888888888888888888888
+
+observability: {}
+parity: {}

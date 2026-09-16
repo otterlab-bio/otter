@@ -1,0 +1,32 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["outDir_mCall"], "{sample}_nsort.bismark.cov.gz"),sample = SIDs),
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_nsort.bam"),sample =SIDs ),
+    os.path.join(config["outDir_mCall"], "methrixh5","assays.h5"),
+    os.path.join(config["outDir_mCall"], "methrixh5","se.rds"),
+    os.path.join(config["outDir_mCall"], "methrixh5","bsseq.RDS"),
+    os.path.join(config["directories"]["bsmap"]["main"], config["graft"],"bismark_summary_report.html"),
+    expand(os.path.join(config["directories"]["bsmap"]["main"],config["graft"], "{sample}.html"),sample = SIDs),
+    os.path.join(config["qc_summary"],"qc_summary.txt")
+    
+
+# bismark report
+
+include:"rules/bismark_report2summary.smk"
+
+# bismark summary 
+
+include:"rules/bismark2summary.smk"
+
+# qc summary
+
+include:"rules/bs_qc_summary.smk"
+
+# methrix
+
+include:"rules/methrix_object.smk"

@@ -1,0 +1,31 @@
+schema_version: otter.project/v1
+
+project:
+  id: cohort-a
+  description: RRBS production comparison project
+
+workflow:
+  scenario: rrbs
+  toolchain: modern
+  legacy_extensions: []
+
+execution:
+  executor: craftmake
+  backend: auto
+  site: auto
+
+samples:
+  manifest: samples.tsv
+
+references:
+  primary: hg38@GRCh38.p14
+
+resources:
+  defaults:
+    cores: 8
+    memory: 32GiB
+    time: "24:00:00"
+
+observability:
+  metrics: true
+  retain_logs: true

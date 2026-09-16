@@ -1,0 +1,90 @@
+name: BeaverRNASEQPDX step3
+version: 1
+on:
+  otter:
+    workflow: BeaverRNASEQPDX
+    phase: step3
+    modes: [RNASEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  count_expression:
+    name: Count filtered graft RNA-seq expression
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      filtered_bam: "${{ config.directories.bsmap.main }}/Filtered_bams/${{ sample.id }}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+      annotation: "${{ config.reference.rnaseq.graft_gtf }}"
+    outputs:
+      counts: "${{ config.directories.methylation_call }}/${{ sample.id }}_${{ config.workflow.species.graft }}.txt"
+    resources:
+      cores: 1
+      memory: 16G
+      partition: amd_512
+    steps:
+      - name: Run HTSeq count on filtered graft BAM
+        run: |
+          mkdir -p "$(dirname '${{ outputs.counts }}')"
+          htseq-count -f bam -r pos -s yes -t exon -i gene_id -m intersection-nonempty '${{ inputs.filtered_bam }}' '${{ inputs.annotation }}' > '${{ outputs.counts }}'
+
+  rnaseq_splicing:
+    name: Run BeaverRNASEQPDX splicing analysis
+    scope: global
+    dimensions: []
+    inputs:
+      sample_counts: "${{ jobs.count_expression.outputs.counts }}"
+      annotation: "${{ config.reference.rnaseq.graft_gtf }}"
+    outputs:
+      outcome: "${{ config.directories.bsmap.main }}/RNASplicing/splicing-outcome.json"
+    resources:
+      cores: 20
+      memory: 32G
+      partition: amd_512
+    steps:
+      - name: Run or classify RNA-seq PDX splicing
+        run: |
+          splicing_directory='${{ config.directories.bsmap.main }}/RNASplicing'
+          outcome_path='${{ outputs.outcome }}'
+          mkdir -p "$splicing_directory"
+          if [ '${{ config.metadata.group_levels }}' -ge 2 ]; then
+            matsrun run --root '${{ config.directories.bsmap.main }}' --threads '${{ resources.cores }}' --pdata '${{ config.directories.selfconfig }}/pdata.xlsx' --seqlengthQC '${{ config.directories.qc.main }}' --gtf '${{ inputs.annotation }}' --pdxmode 1
+            mapfile -t artifact_paths < <(find "$splicing_directory" -type f ! -name 'splicing-outcome.json' -printf '%P\n' | sort)
+            if [ "${#artifact_paths[@]}" -eq 0 ]; then
+              printf 'matsrun reported success but produced no splicing artifacts in %s\n' "$splicing_directory" >&2
+              exit 1
+            fi
+            python - "$outcome_path" "$splicing_directory" "${artifact_paths[@]}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          outcome_path = pathlib.Path(sys.argv[1])
+          outcome = {
+              "schema_version": "otter.rna-splicing-outcome/v1",
+              "status": "produced",
+              "source_root": sys.argv[2],
+              "artifact_paths": sys.argv[3:],
+          }
+          outcome_path.write_text(json.dumps(outcome, indent=2) + "\n", encoding="utf-8")
+          PY
+          else
+            python - "$outcome_path" "$splicing_directory" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          outcome = {
+              "schema_version": "otter.rna-splicing-outcome/v1",
+              "status": "not_applicable",
+              "source_root": sys.argv[2],
+              "artifact_paths": [],
+          }
+          pathlib.Path(sys.argv[1]).write_text(json.dumps(outcome, indent=2) + "\n", encoding="utf-8")
+          PY
+          fi

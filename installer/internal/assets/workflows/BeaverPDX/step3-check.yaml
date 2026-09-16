@@ -1,0 +1,322 @@
+name: BeaverPDX step3 check
+version: 1
+on:
+  otter:
+    workflow: BeaverPDX
+    phase: step3-check
+    modes: [RRBS, WGBS, BSSEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  sample_artifacts:
+    name: Validate BeaverPDX step3 sample artifacts
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      coverage: "${{ config.directories.methylation_call }}/${{ sample.id }}_nsort.bismark.cov.gz"
+      name_sorted_bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_nsort.bam"
+      filtered_bam: "${{ config.directories.bsmap.main }}/Filtered_bams/${{ sample.id }}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+      trim_report_r1: "${{ config.output.trim_dir }}/${{ sample.id }}_R1.fastq.gz_trimming_report.txt"
+      trim_report_r2: "${{ config.output.trim_dir }}/${{ sample.id }}_R2.fastq.gz_trimming_report.txt"
+      fastqc_before_r1: "${{ config.directories.qc.before }}/${{ sample.id }}_R1_fastqcx/fastqc_data.txt"
+      fastqc_before_r2: "${{ config.directories.qc.before }}/${{ sample.id }}_R2_fastqcx/fastqc_data.txt"
+      fastqc_after_r1: "${{ config.directories.qc.after }}/${{ sample.id }}_val_1_fastqcx/fastqc_data.txt"
+      fastqc_after_r2: "${{ config.directories.qc.after }}/${{ sample.id }}_val_2_fastqcx/fastqc_data.txt"
+    outputs:
+      ready: "${{ config.directories.sid_log }}/step3-check/${{ sample.id }}.ready"
+    resources:
+      cores: 1
+      memory: 1G
+      partition: amd_512
+    steps:
+      - name: Write validated BeaverPDX step3 artifact manifest
+        run: |
+          output_path='${{ outputs.ready }}'
+          mkdir -p "$(dirname "$output_path")"
+          temporary_path="$(mktemp "${output_path}.tmp.XXXXXX")"
+          trap 'rm -f "$temporary_path"' EXIT
+
+          ensure_json_safe_string() {
+            local value="$1"
+            if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]"\\]'; then
+              printf 'validated artifact metadata contains unsupported JSON characters: %s\n' "$value" >&2
+              exit 1
+            fi
+          }
+
+          write_artifact() {
+            local artifact_id="$1" artifact_path="$2" media_type="$3"
+            ensure_json_safe_string "$artifact_id"
+            ensure_json_safe_string "$artifact_path"
+            ensure_json_safe_string "$media_type"
+            if [[ -L "$artifact_path" || ! -f "$artifact_path" ]]; then
+              printf 'validated artifact must be a regular non-symlink file: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            local size_bytes sha256
+            size_bytes="$(wc -c < "$artifact_path" | tr -d '[:space:]')"
+            if [[ ! "$size_bytes" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'validated artifact must be non-empty: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            sha256="$(sha256sum -- "$artifact_path" | awk '{print $1}')"
+            if [[ ! "$sha256" =~ ^[a-f0-9]{64}$ ]]; then
+              printf 'could not calculate SHA-256 for validated artifact: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            printf '{"id":"%s","path":"%s","media_type":"%s","size_bytes":%s,"sha256":"%s"}' \
+              "$artifact_id" "$artifact_path" "$media_type" "$size_bytes" "$sha256"
+          }
+
+          ensure_json_safe_string '${{ sample.id }}'
+          {
+            printf '{"schema_version":"otter.sample-artifacts-validation/v1","status":"validated","workflow":"BeaverPDX","phase":"step3-check","sample_id":"%s","dimensions":{"sample":"%s"},"artifacts":[' '${{ sample.id }}' '${{ sample.id }}'
+            first_artifact=true
+            for artifact in \
+              "coverage|${{ inputs.coverage }}|application/gzip" \
+              "name_sorted_bam|${{ inputs.name_sorted_bam }}|application/x-bam" \
+              "filtered_bam|${{ inputs.filtered_bam }}|application/x-bam" \
+              "trim_report_r1|${{ inputs.trim_report_r1 }}|text/plain" \
+              "trim_report_r2|${{ inputs.trim_report_r2 }}|text/plain" \
+              "fastqc_before_r1|${{ inputs.fastqc_before_r1 }}|text/plain" \
+              "fastqc_before_r2|${{ inputs.fastqc_before_r2 }}|text/plain" \
+              "fastqc_after_r1|${{ inputs.fastqc_after_r1 }}|text/plain" \
+              "fastqc_after_r2|${{ inputs.fastqc_after_r2 }}|text/plain"; do
+              IFS='|' read -r artifact_id artifact_path media_type <<< "$artifact"
+              if ! "$first_artifact"; then printf ','; fi
+              write_artifact "$artifact_id" "$artifact_path" "$media_type"
+              first_artifact=false
+            done
+            printf ']}\n'
+          } > "$temporary_path"
+          mv -f "$temporary_path" "$output_path"
+          trap - EXIT
+
+  species_qc_artifacts:
+    name: Validate BeaverPDX species mapping QC artifacts
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      sorted_bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam"
+      qualimap_report: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/qualimapReport.html"
+    outputs:
+      ready: "${{ config.directories.sid_log }}/step3-check/${{ sample.id }}_${{ species.name }}_qc.ready"
+    resources:
+      cores: 1
+      memory: 1G
+      partition: amd_512
+    steps:
+      - name: Write validated BeaverPDX species QC artifact manifest
+        run: |
+          output_path='${{ outputs.ready }}'
+          mkdir -p "$(dirname "$output_path")"
+          temporary_path="$(mktemp "${output_path}.tmp.XXXXXX")"
+          trap 'rm -f "$temporary_path"' EXIT
+
+          ensure_json_safe_string() {
+            local value="$1"
+            if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]"\\]'; then
+              printf 'validated artifact metadata contains unsupported JSON characters: %s\n' "$value" >&2
+              exit 1
+            fi
+          }
+
+          write_artifact() {
+            local artifact_id="$1" artifact_path="$2" media_type="$3"
+            ensure_json_safe_string "$artifact_id"
+            ensure_json_safe_string "$artifact_path"
+            ensure_json_safe_string "$media_type"
+            if [[ -L "$artifact_path" || ! -f "$artifact_path" ]]; then
+              printf 'validated artifact must be a regular non-symlink file: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            local size_bytes sha256
+            size_bytes="$(wc -c < "$artifact_path" | tr -d '[:space:]')"
+            if [[ ! "$size_bytes" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'validated artifact must be non-empty: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            sha256="$(sha256sum -- "$artifact_path" | awk '{print $1}')"
+            if [[ ! "$sha256" =~ ^[a-f0-9]{64}$ ]]; then
+              printf 'could not calculate SHA-256 for validated artifact: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            printf '{"id":"%s","path":"%s","media_type":"%s","size_bytes":%s,"sha256":"%s"}' \
+              "$artifact_id" "$artifact_path" "$media_type" "$size_bytes" "$sha256"
+          }
+
+          ensure_json_safe_string '${{ sample.id }}'
+          ensure_json_safe_string '${{ species.name }}'
+          {
+            printf '{"schema_version":"otter.sample-artifacts-validation/v1","status":"validated","workflow":"BeaverPDX","phase":"step3-check","sample_id":"%s","dimensions":{"sample":"%s","species":"%s"},"artifacts":[' '${{ sample.id }}' '${{ sample.id }}' '${{ species.name }}'
+            write_artifact 'sorted_bam' '${{ inputs.sorted_bam }}' 'application/x-bam'
+            printf ','
+            write_artifact 'qualimap_report' '${{ inputs.qualimap_report }}' 'text/html'
+            printf ']}\n'
+          } > "$temporary_path"
+          mv -f "$temporary_path" "$output_path"
+          trap - EXIT
+
+  prepare_methrix_reference:
+    name: Prepare PDX graft Methrix CpG reference
+    scope: global
+    dimensions: []
+    inputs:
+      genome: "${{ config.reference.graft_fasta }}"
+      annotation: "${{ config.reference.rnaseq.graft_gtf }}"
+    outputs:
+      reference_cpgs: "${{ config.directories.methylation_call }}/methrixh5/reference_cpgs.ron"
+    resources:
+      cores: 1
+      memory: 34G
+      partition: amd_512
+    steps:
+      - name: Prepare CpG reference
+        run: |
+          mkdir -p "$(dirname '${{ outputs.reference_cpgs }}')"
+          reference_path='${{ inputs.genome }}'
+          output_path='${{ outputs.reference_cpgs }}'
+          methx_cli="${METHX:-methx}"
+          methx_extract_command=("$methx_cli" extract-cpgs)
+          if "$methx_cli" extract-cp-gs --help >/dev/null 2>&1; then
+            methx_extract_command=("$methx_cli" extract-cp-gs)
+          fi
+          reference_directory="$(dirname "$reference_path")"
+          genome_key='${{ config.workflow.species.graft }}'
+          annotation_path='${{ inputs.annotation }}'
+          if [[ -L "$annotation_path" || ! -f "$annotation_path" ]]; then
+            printf 'Methrix annotation must be a regular resolved GTF: %s\n' "$annotation_path" >&2
+            exit 1
+          fi
+          install -m 0644 "$annotation_path" "$(dirname "$output_path")/$genome_key.gtf"
+          if [[ "$reference_path" == *.ron || "$reference_path" == *.con ]]; then
+            cp -f "$reference_path" "$output_path"
+          elif [ -f "${reference_path}.ron" ]; then
+            cp -f "${reference_path}.ron" "$output_path"
+          else
+            reference_name="$(basename "$reference_path")"
+            reference_name="${reference_name%.gz}"
+            reference_name="${reference_name%.fa}"
+            reference_name="${reference_name%.fasta}"
+            reference_name="${reference_name%.fna}"
+            nearby_reference="$reference_directory/${reference_name}.ron"
+            if [ -f "$nearby_reference" ]; then
+              cp -f "$nearby_reference" "$output_path"
+            else
+              "${methx_extract_command[@]}" --genome "$reference_path" --output "$output_path"
+              if grep -q 'cpgs: \[\]' "$output_path"; then
+                contigs=()
+                while IFS= read -r header; do
+                  if [[ "$header" == '>'* ]]; then
+                    contig="${header#>}"
+                    contig="${contig%%[[:space:]]*}"
+                    contigs+=("$contig")
+                  fi
+                done < <(if [[ "$reference_path" == *.gz ]]; then gzip -cd "$reference_path"; else cat "$reference_path"; fi)
+                if [ "${#contigs[@]}" -eq 0 ]; then
+                  echo "no FASTA contigs found in $reference_path" >&2
+                  exit 1
+                fi
+                contig_arguments=()
+                for contig in "${contigs[@]}"; do
+                  contig_arguments+=(--contigs "$contig")
+                done
+                "${methx_extract_command[@]}" --genome "$reference_path" --output "$output_path" "${contig_arguments[@]}"
+              fi
+            fi
+          fi
+
+  create_methrix_object:
+    name: Build BeaverPDX Methrix object
+    scope: global
+    dimensions: []
+    inputs:
+      sample_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+      reference_cpgs: "${{ jobs.prepare_methrix_reference.outputs.reference_cpgs }}"
+    outputs:
+      assays: "${{ config.directories.methylation_call }}/methrixh5/assays.h5"
+      methrix_data: "${{ config.directories.methylation_call }}/methrixh5/methrix_data.h5"
+      coverage_report: "${{ config.directories.methylation_call }}/methrixh5/CpG_coverage.xlsx"
+      annotation_report: "${{ config.directories.methylation_call }}/methrixh5/CpG_annotation_report.xlsx"
+      annotation_details: "${{ config.directories.methylation_call }}/methrixh5/CpG_annotation_details.tsv.gz"
+    resources:
+      cores: 10
+      memory: 34G
+      time: 08:00:00
+      partition: amd_512
+    steps:
+      - name: Build Methrix object
+        run: |
+          mkdir -p '${{ config.directories.methylation_call }}/methrixh5'
+          methx_cli="${METHX:-methx}"
+          "$methx_cli" process --input '${{ config.directories.methylation_call }}' --output '${{ config.directories.methylation_call }}/methrixh5' --genome '${{ inputs.reference_cpgs }}' --annotation-dir '${{ config.directories.methylation_call }}/methrixh5' --threads '${{ resources.cores }}'
+
+  bismark_report:
+    name: Build PDX graft Bismark sample report
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      sample_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+      alignment: "${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}/${{ sample.id }}_val_1_bismark_bt2_pe.bam"
+      alignment_report: "${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}/${{ sample.id }}_val_1_bismark_bt2_PE_report.txt"
+      splitting_report: "${{ config.directories.methylation_call }}/${{ sample.id }}_nsort_splitting_report.txt"
+      mbias_report: "${{ config.directories.methylation_call }}/${{ sample.id }}_nsort.M-bias.txt"
+    outputs:
+      report: "${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}/${{ sample.id }}.html"
+    resources:
+      cores: 1
+      memory: 16G
+      partition: amd_512
+    steps:
+      - name: Run Bismark report
+        environment: otter-core
+        run: |
+          mkdir -p '${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}'
+          bismark2report --dir '${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}' --output '${{ sample.id }}.html' --alignment_report '${{ inputs.alignment_report }}' --splitting_report '${{ inputs.splitting_report }}' --mbias_report '${{ inputs.mbias_report }}'
+
+  bismark_summary:
+    name: Build PDX graft Bismark summary
+    scope: global
+    dimensions: []
+    inputs:
+      sample_reports: "${{ jobs.bismark_report.outputs.report }}"
+    outputs:
+      report: "${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}/bismark_summary_report.html"
+    resources:
+      cores: 1
+      memory: 16G
+      partition: amd_512
+    steps:
+      - name: Run Bismark summary
+        environment: otter-core
+        run: |
+          cd '${{ config.directories.bsmap.main }}/${{ config.workflow.species.graft }}'
+          bismark2summary *_val_1_bismark_bt2_pe.bam
+
+  qc_summary:
+    name: Build BeaverPDX QC summary
+    scope: global
+    dimensions: []
+    inputs:
+      sample_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+      species_qc_artifacts: "${{ jobs.species_qc_artifacts.outputs.ready }}"
+      methrix_coverage: "${{ jobs.create_methrix_object.outputs.coverage_report }}"
+      run_config: "${{ paths.config }}"
+    outputs:
+      report: "${{ config.directories.qc_summary }}/qc_summary.xlsx"
+    resources:
+      cores: 5
+      memory: 8G
+      partition: amd_512
+    steps:
+      - name: Run QC summary
+        environment: otter-core
+        run: |
+          mkdir -p '${{ config.directories.qc_summary }}'
+          qctb --config '${{ inputs.run_config }}' --output '${{ outputs.report }}'

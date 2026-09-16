@@ -1,0 +1,235 @@
+name: BeaverPDX step2 check
+version: 1
+on:
+  otter:
+    workflow: BeaverPDX
+    phase: step2-check
+    modes: [RRBS, WGBS, BSSEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  sample_artifacts:
+    name: Validate BeaverPDX step2 sample artifacts
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam"
+      bam_index: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam.bai"
+      qualimap_html: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/qualimapReport.html"
+      qualimap_pdf: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/report.pdf"
+      gc_metrics: "${{ config.directories.qc.main }}/GCbias/${{ sample.id }}_${{ species.name }}/gc_bias_metrics.txt"
+      gc_chart: "${{ config.directories.qc.main }}/GCbias/${{ sample.id }}_${{ species.name }}/gc_bias_metrics.pdf"
+      gc_summary: "${{ config.directories.qc.main }}/GCbias/${{ sample.id }}_${{ species.name }}/summary_metrics.txt"
+    outputs:
+      ready: "${{ config.directories.sid_log }}/step2-check/${{ sample.id }}_${{ species.name }}.ready"
+    resources:
+      cores: 1
+      memory: 1G
+      partition: amd_512
+    steps:
+      - name: Write validated BeaverPDX artifact manifest
+        run: |
+          output_path='${{ outputs.ready }}'
+          mkdir -p "$(dirname "$output_path")"
+          temporary_path="$(mktemp "${output_path}.tmp.XXXXXX")"
+          trap 'rm -f "$temporary_path"' EXIT
+
+          ensure_json_safe_string() {
+            local value="$1"
+            if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]"\\]'; then
+              printf 'validated artifact metadata contains unsupported JSON characters: %s\n' "$value" >&2
+              exit 1
+            fi
+          }
+
+          write_artifact() {
+            local artifact_id="$1"
+            local artifact_path="$2"
+            local media_type="$3"
+            ensure_json_safe_string "$artifact_id"
+            ensure_json_safe_string "$artifact_path"
+            ensure_json_safe_string "$media_type"
+            if [[ -L "$artifact_path" || ! -f "$artifact_path" ]]; then
+              printf 'validated artifact must be a regular non-symlink file: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            local size_bytes sha256
+            size_bytes="$(wc -c < "$artifact_path" | tr -d '[:space:]')"
+            if [[ ! "$size_bytes" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'validated artifact must be non-empty: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            sha256="$(sha256sum -- "$artifact_path" | awk '{print $1}')"
+            if [[ ! "$sha256" =~ ^[a-f0-9]{64}$ ]]; then
+              printf 'could not calculate SHA-256 for validated artifact: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            printf '{"id":"%s","path":"%s","media_type":"%s","size_bytes":%s,"sha256":"%s"}' \
+              "$artifact_id" "$artifact_path" "$media_type" "$size_bytes" "$sha256"
+          }
+
+          ensure_json_safe_string '${{ sample.id }}'
+          ensure_json_safe_string '${{ species.name }}'
+          {
+            printf '{"schema_version":"otter.sample-artifacts-validation/v1","status":"validated","workflow":"BeaverPDX","phase":"step2-check","sample_id":"%s","dimensions":{"sample":"%s","species":"%s"},"artifacts":[' '${{ sample.id }}' '${{ sample.id }}' '${{ species.name }}'
+            first_artifact=true
+            for artifact in \
+              "bam|${{ inputs.bam }}|application/x-bam" \
+              "bam_index|${{ inputs.bam_index }}|application/x-bam-index" \
+              "qualimap_html|${{ inputs.qualimap_html }}|text/html" \
+              "qualimap_pdf|${{ inputs.qualimap_pdf }}|application/pdf" \
+              "gc_metrics|${{ inputs.gc_metrics }}|text/plain" \
+              "gc_chart|${{ inputs.gc_chart }}|application/pdf" \
+              "gc_summary|${{ inputs.gc_summary }}|text/plain"; do
+              IFS='|' read -r artifact_id artifact_path media_type <<< "$artifact"
+              if ! "$first_artifact"; then printf ','; fi
+              write_artifact "$artifact_id" "$artifact_path" "$media_type"
+              first_artifact=false
+            done
+            printf ']}\n'
+          } > "$temporary_path"
+          mv -f "$temporary_path" "$output_path"
+          trap - EXIT
+
+  xenofilx:
+    name: Filter host reads from PDX BAM files
+    scope: global
+    dimensions: []
+    inputs:
+      validated_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+    outputs:
+      validation_manifest: "${{ config.directories.bsmap.main }}/Filtered_bams/filtered-bam-validation.json"
+    resources:
+      cores: 4
+      memory: 128G
+      partition: amd_512
+    steps:
+      - name: Run Xenofilx
+        run: |
+          filtered_directory='${{ config.directories.bsmap.main }}/Filtered_bams'
+          mkdir -p "$filtered_directory"
+          temporary_filtered_directory="$(mktemp -d "${TMPDIR:-/tmp}/craftmake-xenofilx.XXXXXX")"
+          trap 'rm -rf "$temporary_filtered_directory"' EXIT
+          shopt -s nullglob
+          graft_bams=()
+          host_bams=()
+          for graft_bam in "${{ config.directories.bsmap.main }}"/*_"${{ config.workflow.species.graft }}".bam; do
+            [[ "$(basename "$graft_bam")" == *_fixed_* ]] && continue
+            graft_bams+=("$graft_bam")
+          done
+          for host_bam in "${{ config.directories.bsmap.main }}"/*_"${{ config.workflow.species.host }}".bam; do
+            [[ "$(basename "$host_bam")" == *_fixed_* ]] && continue
+            host_bams+=("$host_bam")
+          done
+          if (( ${#graft_bams[@]} == 0 || ${#graft_bams[@]} != ${#host_bams[@]} )); then
+            printf 'expected a non-empty, paired set of original graft and host BAMs\n' >&2
+            exit 1
+          fi
+          xenofilx_command=(xenofilx run)
+          for graft_bam in "${graft_bams[@]}"; do
+            sample_prefix="$(basename "$graft_bam" _'${{ config.workflow.species.graft }}'.bam)"
+            xenofilx_command+=(--graft "$graft_bam" --output-names "${sample_prefix}_fixed_${{ config.workflow.species.graft }}_Filtered.bam")
+          done
+          for host_bam in "${host_bams[@]}"; do xenofilx_command+=(--host "$host_bam"); done
+          xenofilx_command+=(--output "$temporary_filtered_directory" --mm-threshold 6 --unmapped-penalty 8 --threads '${{ resources.cores }}' --sort-memory 12G --recalculate-nm --graft-ref '${{ config.reference.graft_fasta }}' --host-ref '${{ config.reference.host_fasta }}' --bisulfite)
+          xenofilx_exit_code=0
+          "${xenofilx_command[@]}" || xenofilx_exit_code=$?
+          if (( xenofilx_exit_code != 0 )); then
+            printf 'Xenofilx exited with code %d; validating generated outputs before deciding task status.\n' "$xenofilx_exit_code" >&2
+          fi
+          samtools_path="${SAMTOOLS:-samtools}"
+          for graft_bam in "${graft_bams[@]}"; do
+            sample_prefix="$(basename "$graft_bam" _'${{ config.workflow.species.graft }}'.bam)"
+            temporary_filtered_bam="$temporary_filtered_directory/${sample_prefix}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+            temporary_filtered_bai="$temporary_filtered_bam.bai"
+            if [[ ! -s "$temporary_filtered_bam" || ! -s "$temporary_filtered_bai" ]]; then
+              printf 'Xenofilx did not produce non-empty filtered BAM and BAI: %s, %s\n' "$temporary_filtered_bam" "$temporary_filtered_bai" >&2
+              exit 1
+            fi
+            "$samtools_path" quickcheck -v "$temporary_filtered_bam"
+            filtered_read_count="$("$samtools_path" view -c -F 4 "$temporary_filtered_bam")"
+            if (( filtered_read_count <= 0 )); then
+              printf 'Xenofilx filtered BAM has no mapped reads: %s\n' "$temporary_filtered_bam" >&2
+              exit 1
+            fi
+          done
+          for graft_bam in "${graft_bams[@]}"; do
+            sample_prefix="$(basename "$graft_bam" _'${{ config.workflow.species.graft }}'.bam)"
+            temporary_filtered_bam="$temporary_filtered_directory/${sample_prefix}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+            final_filtered_bam="$filtered_directory/${sample_prefix}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+            final_filtered_bai="$final_filtered_bam.bai"
+            mv "$temporary_filtered_bam" "$final_filtered_bam"
+            mv "$temporary_filtered_bam.bai" "$final_filtered_bai"
+            if [[ ! -s "$final_filtered_bai" ]]; then
+              printf 'Xenofilx did not provide a non-empty filtered BAM index: %s\n' "$final_filtered_bai" >&2
+              exit 1
+            fi
+          done
+          manifest_path='${{ outputs.validation_manifest }}'
+          temporary_manifest="$(mktemp "${manifest_path}.tmp.XXXXXX")"
+          trap 'rm -rf "$temporary_filtered_directory"; rm -f "$temporary_manifest"' EXIT
+
+          ensure_json_safe_string() {
+            local value="$1"
+            if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]"\\]'; then
+              printf 'filtered BAM manifest metadata contains unsupported JSON characters: %s\n' "$value" >&2
+              exit 1
+            fi
+          }
+
+          write_filtered_artifact() {
+            local sample_id="$1"
+            local filtered_bam="$2"
+            local filtered_bai="$3"
+            ensure_json_safe_string "$sample_id"
+            ensure_json_safe_string "$filtered_bam"
+            ensure_json_safe_string "$filtered_bai"
+            if [[ -L "$filtered_bam" || ! -f "$filtered_bam" || -L "$filtered_bai" || ! -f "$filtered_bai" ]]; then
+              printf 'filtered BAM and BAI must be regular non-symlink files: %s, %s\n' "$filtered_bam" "$filtered_bai" >&2
+              exit 1
+            fi
+            local bam_size_bytes bai_size_bytes bam_sha256 bai_sha256 mapped_read_count
+            bam_size_bytes="$(wc -c < "$filtered_bam" | tr -d '[:space:]')"
+            bai_size_bytes="$(wc -c < "$filtered_bai" | tr -d '[:space:]')"
+            if [[ ! "$bam_size_bytes" =~ ^[1-9][0-9]*$ || ! "$bai_size_bytes" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'filtered BAM and BAI must be non-empty: %s, %s\n' "$filtered_bam" "$filtered_bai" >&2
+              exit 1
+            fi
+            "$samtools_path" quickcheck -v "$filtered_bam"
+            mapped_read_count="$("$samtools_path" view -c -F 4 "$filtered_bam")"
+            if [[ ! "$mapped_read_count" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'filtered BAM has no mapped reads: %s\n' "$filtered_bam" >&2
+              exit 1
+            fi
+            bam_sha256="$(sha256sum -- "$filtered_bam" | awk '{print $1}')"
+            bai_sha256="$(sha256sum -- "$filtered_bai" | awk '{print $1}')"
+            if [[ ! "$bam_sha256" =~ ^[a-f0-9]{64}$ || ! "$bai_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+              printf 'could not calculate filtered BAM checksums: %s, %s\n' "$filtered_bam" "$filtered_bai" >&2
+              exit 1
+            fi
+            printf '{"sample_id":"%s","bam_path":"%s","bam_size_bytes":%s,"bam_sha256":"%s","bai_path":"%s","bai_size_bytes":%s,"bai_sha256":"%s","mapped_read_count":%s}' \
+              "$sample_id" "$filtered_bam" "$bam_size_bytes" "$bam_sha256" "$filtered_bai" "$bai_size_bytes" "$bai_sha256" "$mapped_read_count"
+          }
+
+          ensure_json_safe_string '${{ config.workflow.species.graft }}'
+          {
+            printf '{"schema_version":"otter.filtered-bam-validation/v1","status":"validated","workflow":"BeaverPDX","phase":"step2-check","graft_species":"%s","artifacts":[' '${{ config.workflow.species.graft }}'
+            first_artifact=true
+            for graft_bam in "${graft_bams[@]}"; do
+              sample_id="$(basename "$graft_bam" _'${{ config.workflow.species.graft }}'.bam)"
+              filtered_bam="$filtered_directory/${sample_id}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+              if ! "$first_artifact"; then printf ','; fi
+              write_filtered_artifact "$sample_id" "$filtered_bam" "$filtered_bam.bai"
+              first_artifact=false
+            done
+            printf ']}\n'
+          } > "$temporary_manifest"
+          mv -f "$temporary_manifest" "$manifest_path"
+          trap - EXIT
+          rm -rf "$temporary_filtered_directory"

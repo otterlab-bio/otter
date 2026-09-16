@@ -1,0 +1,19 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["bsmap"]["main"],"Filtered_bams" ,"{sample}_fixed_"+config["graft"]+"_Filtered.bam"), sample=SIDs) ,
+    expand(os.path.join(config["outDir_mCall"], "{sample}_"+config["graft"]+".txt"), sample=SIDs),
+    os.path.join(config["directories"]["bsmap"]["main"], "RNASplicing", "splicing-outcome.json")
+
+# build matrix
+
+include:"rules/rnaseq_htseq_xen.smk"
+
+# RNA Splicing
+
+include:"rules/rnaseq_splicing.smk"
+

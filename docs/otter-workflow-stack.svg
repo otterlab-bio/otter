@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Otter reproducible workflow stack</title>
+  <desc id="desc">A project-native diagram showing Otter coordinating Craftmake, Enva, domain operators, and the shared Bamdriver layer from FASTQ inputs to auditable evidence.</desc>
+  <rect width="1200" height="360" rx="24" fill="#0b1220"/>
+  <path d="M48 74H1152" stroke="#2f4058" stroke-width="2"/>
+  <text x="56" y="48" fill="#64d6c4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="700" letter-spacing="2">REPRODUCIBLE WORKFLOW CONTROL PLANE</text>
+  <text x="56" y="142" fill="#f5f7fb" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="42" font-weight="700">FASTQ -&gt; RUN -&gt; EVIDENCE</text>
+  <text x="56" y="180" fill="#a7b1c2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18">Explicit inputs, immutable identity, focused operators,</text>
+  <text x="56" y="207" fill="#a7b1c2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18">and outputs that can be checked after execution.</text>
+  <rect x="56" y="252" width="250" height="48" rx="8" fill="#132338" stroke="#2f4058"/>
+  <text x="74" y="282" fill="#ffb86c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">otter.run/v1</text>
+  <text x="218" y="282" fill="#a7b1c2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15">immutable snapshot</text>
+
+  <g transform="translate(420 112)">
+    <path d="M116 54H152M256 54H292M396 54H432M536 54H572" stroke="#64d6c4" stroke-width="3"/>
+    <path d="M146 47L156 54L146 61M286 47L296 54L286 61M426 47L436 54L426 61M566 47L576 54L566 61" fill="none" stroke="#64d6c4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect width="116" height="108" rx="12" fill="#173f4b" stroke="#64d6c4" stroke-width="2"/>
+    <text x="58" y="38" text-anchor="middle" fill="#f5f7fb" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="21" font-weight="700">otter</text>
+    <text x="58" y="66" text-anchor="middle" fill="#bfeee7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">project + task</text>
+    <text x="58" y="86" text-anchor="middle" fill="#bfeee7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">control</text>
+
+    <rect x="152" width="104" height="108" rx="12" fill="#29354a" stroke="#6f86a3" stroke-width="2"/>
+    <text x="204" y="38" text-anchor="middle" fill="#f5f7fb" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="19" font-weight="700">craftmake</text>
+    <text x="204" y="66" text-anchor="middle" fill="#c6d0df" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">DAG + state</text>
+    <text x="204" y="86" text-anchor="middle" fill="#c6d0df" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">Local / SLURM</text>
+
+    <rect x="292" width="104" height="108" rx="12" fill="#29354a" stroke="#6f86a3" stroke-width="2"/>
+    <text x="344" y="38" text-anchor="middle" fill="#f5f7fb" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="21" font-weight="700">enva</text>
+    <text x="344" y="66" text-anchor="middle" fill="#c6d0df" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">runtime</text>
+    <text x="344" y="86" text-anchor="middle" fill="#c6d0df" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">environments</text>
+
+    <rect x="432" width="104" height="108" rx="12" fill="#40364a" stroke="#d19ac0" stroke-width="2"/>
+    <text x="484" y="34" text-anchor="middle" fill="#f5f7fb" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="700">operators</text>
+    <text x="484" y="62" text-anchor="middle" fill="#ead4e3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13">fastqcx - xenofilx</text>
+    <text x="484" y="82" text-anchor="middle" fill="#ead4e3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13">methx - qctb - ...</text>
+
+    <rect x="572" width="116" height="108" rx="12" fill="#4b3a28" stroke="#ffb86c" stroke-width="2"/>
+    <text x="630" y="38" text-anchor="middle" fill="#f5f7fb" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="19" font-weight="700">bamdriver</text>
+    <text x="630" y="66" text-anchor="middle" fill="#ffe0b4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">BAM / BGZF</text>
+    <text x="630" y="86" text-anchor="middle" fill="#ffe0b4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">shared layer</text>
+  </g>
+
+  <text x="420" y="278" fill="#a7b1c2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">Snakemake remains the explicit compatibility path while Craftmake integration is validated.</text>
+  <circle cx="420" cy="310" r="5" fill="#64d6c4"/>
+  <text x="435" y="316" fill="#f5f7fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">inputs</text>
+  <circle cx="530" cy="310" r="5" fill="#6f86a3"/>
+  <text x="545" y="316" fill="#f5f7fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">execution</text>
+  <circle cx="666" cy="310" r="5" fill="#ffb86c"/>
+  <text x="681" y="316" fill="#f5f7fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">artifacts</text>
+</svg>

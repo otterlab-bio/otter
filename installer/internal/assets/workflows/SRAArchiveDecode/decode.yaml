@@ -1,0 +1,106 @@
+name: Gate 6 SRA archive decode
+version: 1
+on:
+  otter:
+    workflow: SRAArchiveDecode
+    phase: decode
+    modes: [STANDALONE]
+defaults:
+  shell: bash
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  decode_and_publish:
+    name: Decode and publish verified paired FASTQ
+    scope: global
+    inputs:
+      archive: "${{ config.acquisition.archive_path }}"
+      archive_checksum: "${{ config.acquisition.archive_checksum_path }}"
+    outputs:
+      manifest: "${{ config.acquisition.output_root }}/sra-acquisition-decode.json"
+    resources:
+      cores: 8
+      memory: 64G
+      partition: amd_512
+      time: 24:00:00
+    steps:
+      - name: Verify archive, decode, audit, and create-only publish
+        run: |
+          set -euo pipefail
+          archive_path='${{ inputs.archive }}'
+          archive_checksum_path='${{ inputs.archive_checksum }}'
+          output_root='${{ config.acquisition.output_root }}'
+          expected_archive_sha256='${{ config.acquisition.archive_sha256 }}'
+          expected_archive_md5='${{ config.acquisition.archive_md5 }}'
+          expected_archive_bytes='${{ config.acquisition.archive_bytes }}'
+          accession='${{ config.acquisition.accession }}'
+          fasterq_dump='${{ config.acquisition.fasterq_dump }}'
+          pigz_binary='${{ config.acquisition.pigz }}'
+          job_identity="${SLURM_JOB_ID:-local-${RANDOM}}"
+          staging_root="${output_root}.staging-${job_identity}"
+          publication_root="${output_root}.publication-${job_identity}"
+          raw_root="${staging_root}/raw"
+          temporary_root="${staging_root}/temporary"
+
+          [[ -f "${archive_path}" && ! -L "${archive_path}" ]]
+          [[ -f "${archive_checksum_path}" && ! -L "${archive_checksum_path}" ]]
+          [[ ! -e "${output_root}" && ! -e "${staging_root}" && ! -e "${publication_root}" ]]
+          [[ "$(stat -c '%s' "${archive_path}")" == "${expected_archive_bytes}" ]]
+          [[ "$(md5sum "${archive_path}" | cut -d' ' -f1)" == "${expected_archive_md5}" ]]
+          [[ "$(sha256sum "${archive_path}" | cut -d' ' -f1)" == "${expected_archive_sha256}" ]]
+          (cd "$(dirname "${archive_path}")" && sha256sum -c "${archive_checksum_path}")
+
+          mkdir -p "${raw_root}" "${temporary_root}"
+          trap 'rm -rf "${staging_root}" "${publication_root}"' EXIT
+          "${fasterq_dump}" --split-files -e '${{ resources.cores }}' -O "${raw_root}" -t "${temporary_root}" "${archive_path}"
+          [[ -s "${raw_root}/${accession}_1.fastq" && -s "${raw_root}/${accession}_2.fastq" ]]
+          "${pigz_binary}" -n -p '${{ resources.cores }}' "${raw_root}/${accession}_1.fastq" "${raw_root}/${accession}_2.fastq"
+          mkdir "${publication_root}"
+          mv "${raw_root}/${accession}_1.fastq.gz" "${publication_root}/R1.fastq.gz"
+          mv "${raw_root}/${accession}_2.fastq.gz" "${publication_root}/R2.fastq.gz"
+          gzip -t "${publication_root}/R1.fastq.gz" "${publication_root}/R2.fastq.gz"
+
+          python3 - "${publication_root}" "${output_root}" "${archive_path}" "${accession}" "${expected_archive_sha256}" "${expected_archive_md5}" "${expected_archive_bytes}" "${fasterq_dump}" "${pigz_binary}" <<'PY'
+          import gzip, hashlib, json, subprocess, sys
+          from pathlib import Path
+          publication_root = Path(sys.argv[1])
+          output_root = Path(sys.argv[2])
+          archive_path = Path(sys.argv[3])
+          accession, archive_sha256, archive_md5 = sys.argv[4:7]
+          archive_bytes = int(sys.argv[7])
+          fasterq_dump, pigz_binary = sys.argv[8:10]
+          def digest(path):
+              checksum = hashlib.sha256()
+              with path.open('rb') as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                      checksum.update(chunk)
+              return checksum.hexdigest()
+          def records(path):
+              total = 0
+              with gzip.open(path, 'rb') as handle:
+                  while header := handle.readline():
+                      sequence, separator, quality = handle.readline(), handle.readline(), handle.readline()
+                      if not sequence or not separator or not quality or not header.startswith(b'@') or not separator.startswith(b'+'):
+                          raise RuntimeError(f'invalid FASTQ record in {path}')
+                      if len(sequence.rstrip()) != len(quality.rstrip()):
+                          raise RuntimeError(f'sequence/quality length mismatch in {path}')
+                      total += 1
+              if total == 0: raise RuntimeError(f'empty FASTQ output: {path}')
+              return total
+          r1, r2 = publication_root / 'R1.fastq.gz', publication_root / 'R2.fastq.gz'
+          r1_records, r2_records = records(r1), records(r2)
+          if r1_records != r2_records: raise RuntimeError(f'paired record counts differ: R1={r1_records}, R2={r2_records}')
+          manifest = {'schema_version':'otter.sra-fastq-decode/v1','accession':accession,'archive':{'path':str(archive_path),'sha256':'sha256:'+archive_sha256,'md5':archive_md5,'bytes':archive_bytes},'outputs':{'r1':{'path':str(output_root / 'R1.fastq.gz'),'sha256':'sha256:'+digest(r1),'bytes':r1.stat().st_size,'paired_record_count':r1_records},'r2':{'path':str(output_root / 'R2.fastq.gz'),'sha256':'sha256:'+digest(r2),'bytes':r2.stat().st_size,'paired_record_count':r2_records}},'tool':{'name':'sra-tools','fasterq_dump':fasterq_dump,'fasterq_dump_version':subprocess.run([fasterq_dump,'-V'],check=True,capture_output=True,text=True).stdout.strip(),'compression':f'{pigz_binary} -n -p 8','pigz_version':subprocess.run([pigz_binary,'--version'],check=True,capture_output=True,text=True).stdout.strip()}}
+          manifest_path = publication_root / 'sra-acquisition-decode.json'
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
+          (publication_root / 'checksums.sha256').write_text('\n'.join(f'{digest(path)}  {path.name}' for path in (r1, r2, manifest_path)) + '\n')
+          PY
+          (cd "${publication_root}" && sha256sum -c checksums.sha256)
+          chmod 0444 "${publication_root}"/*
+          chmod 0555 "${publication_root}"
+          mv "${publication_root}" "${output_root}"
+          trap - EXIT
+          rm -rf "${staging_root}"

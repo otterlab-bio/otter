@@ -1,0 +1,22 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_{species}.bam"), sample=SIDs,species = species) ,
+    expand(os.path.join(config["directories"]["qualimap"],"{sample}_{species}","qualimapReport.html") , sample=SIDs,species = species) ,
+    expand(os.path.join(config["directories"]["methylation_call"], "{sample}_{species}"+".txt"), sample=SIDs,species = species)
+
+# bowtie2 mapping
+
+include: "rules/rnaseq_mapping.smk"
+
+# qualimap
+
+include:"rules/05-3-qualimap.smk"
+
+# build matrix
+
+include:"rules/rnaseq_htseq.smk"

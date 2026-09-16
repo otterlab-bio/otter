@@ -1,0 +1,51 @@
+schema_version: otter.reference/v1
+
+reference:
+  id: hg38
+  release: GRCh38.p14
+  organism: Homo sapiens
+  assembly: GRCh38
+  aliases:
+    - human
+    - hg38
+
+assets:
+  fasta:
+    path: fasta/genome.fa.gz
+    sha256: sha256:1111111111111111111111111111111111111111111111111111111111111111
+    size_bytes: 1000000000
+    fai: fasta/genome.fa.gz.fai
+  annotations:
+    - id: gencode-v44
+      type: gtf
+      path: annotations/gencode.v44.gtf.gz
+      sha256: sha256:2222222222222222222222222222222222222222222222222222222222222222
+  indexes:
+    - type: bismark
+      path: indexes/bismark
+      reference_fasta_sha256: sha256:1111111111111111111111111111111111111111111111111111111111111111
+      tool: bismark
+      tool_version: 0.24.2
+      parameters: {}
+      manifest_sha256: sha256:3333333333333333333333333333333333333333333333333333333333333333
+    - type: star
+      path: indexes/star
+      reference_fasta_sha256: sha256:1111111111111111111111111111111111111111111111111111111111111111
+      tool: STAR
+      tool_version: 2.7.11b
+      parameters:
+        sjdbOverhang: 149
+      manifest_sha256: sha256:4444444444444444444444444444444444444444444444444444444444444444
+
+compatibility:
+  scenarios:
+    - rrbs
+    - wgbs
+    - rnaseq
+    - bs-pdx
+    - rna-pdx
+  workflows:
+    - BeaverBS
+    - BeaverRNA
+    - BeaverPDX
+    - BeaverRNASEQPDX

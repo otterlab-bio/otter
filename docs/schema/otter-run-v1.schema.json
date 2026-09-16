@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-run-v1.schema.json",
+  "title": "Otter immutable run snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run", "project", "workflow", "execution", "samples", "references", "paths", "digests"],
+  "properties": {
+    "schema_version": { "const": "otter.run/v1" },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "created_at", "immutable"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^run-[0-9]{8}T[0-9]{6}Z-[a-z]{6}$" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "immutable": { "const": true },
+        "parent_run_id": { "type": "string", "pattern": "^run-[0-9]{8}T[0-9]{6}Z-[a-z]{6}$" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "root"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "root": { "type": "string", "pattern": "^/" }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "toolchain", "asset_root"],
+      "properties": {
+        "scenario": { "enum": ["rrbs", "wgbs", "rnaseq", "bs-pdx", "rna-pdx"] },
+        "toolchain": { "enum": ["modern", "legacy-equivalent"] },
+        "legacy_extensions": { "type": "array", "items": { "type": "string" } },
+        "asset_root": { "type": "string", "pattern": "^/" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor", "backend", "site"],
+      "properties": {
+        "executor": { "$ref": "#/$defs/resolvedExecutor" },
+        "backend": { "$ref": "#/$defs/resolvedBackend" },
+        "site": { "$ref": "#/$defs/resolvedString" },
+        "resources": { "$ref": "#/$defs/projectResources" },
+        "slurm": { "$ref": "#/$defs/resolvedSlurmResources" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "properties": { "value": { "const": "slurm" } },
+                "required": ["value"]
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": { "required": ["slurm"] }
+        }
+      ]
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "r1", "r2"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "r1": { "type": "string", "pattern": "^/" },
+          "r2": { "type": "string", "pattern": "^/" },
+          "group": { "type": "string" },
+          "batch": { "type": "string" },
+          "adapter_r1": { "type": "string" },
+          "adapter_r2": { "type": "string" },
+          "r1_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "r1_size_bytes": { "type": "integer", "minimum": 1 },
+          "r2_sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "r2_size_bytes": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "references": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolved"],
+      "properties": {
+        "project_selection": { "$ref": "#/$defs/referenceSelections" },
+        "effective_selection": { "$ref": "#/$defs/referenceSelections" },
+        "override": { "type": "boolean" },
+        "override_source": { "enum": ["none", "project", "cli", "override-file"] },
+        "resolved": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/resolvedReference" } }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_root", "work", "results", "logs", "state", "metrics"],
+      "properties": {
+        "run_root": { "type": "string", "pattern": "^/" },
+        "work": { "type": "string", "pattern": "^/" },
+        "results": { "type": "string", "pattern": "^/" },
+        "logs": { "type": "string", "pattern": "^/" },
+        "state": { "type": "string", "pattern": "^/" },
+        "metrics": { "type": "string", "pattern": "^/" },
+        "project_config": { "type": "string", "pattern": "^/" },
+        "samples_manifest": { "type": "string", "pattern": "^/" },
+        "references_lock": { "type": "string", "pattern": "^/" },
+        "workflow_assets": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^/" }
+        }
+      }
+    },
+    "digests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "samples", "workflow_assets"],
+      "properties": {
+        "project": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "samples": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "workflow_assets": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "references": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "observability": { "$ref": "#/$defs/observability" },
+    "parity": { "$ref": "#/$defs/parity" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "parity": {
+            "properties": {
+              "policy": { "const": "executor-phase-envelope/v1" }
+            },
+            "required": ["policy"]
+          }
+        },
+        "required": ["parity"]
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "resources": { "$ref": "#/$defs/parityPhaseResources" }
+            },
+            "required": ["resources"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "source": { "enum": ["default", "project", "cli", "profile", "detection"] },
+    "resourceSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cores": { "type": "integer", "minimum": 0 },
+        "memory": { "type": "string", "pattern": "^[1-9][0-9]*(MiB|GiB)$" },
+        "time": { "type": "string", "pattern": "^(?:[0-9]+-)?[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$" },
+        "partition": { "type": "string" }
+      }
+    },
+    "projectResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaults": { "$ref": "#/$defs/resourceSpec" },
+        "phases": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/resourceSpec" }
+        }
+      }
+    },
+    "parityPhaseResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phases"],
+      "properties": {
+        "defaults": { "$ref": "#/$defs/resourceSpec" },
+        "phases": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "allOf": [
+              { "$ref": "#/$defs/resourceSpec" },
+              { "required": ["cores", "memory", "time", "partition"] }
+            ]
+          }
+        }
+      }
+    },
+    "referenceSelections": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary": { "type": "string", "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$" },
+        "secondary": { "type": "string", "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$" },
+        "graft": { "type": "string", "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$" },
+        "host": { "type": "string", "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$" }
+      }
+    },
+    "backendEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cluster": { "type": "string" },
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "reason": { "type": "string" }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metrics": { "type": "boolean" },
+        "retain_logs": { "type": "boolean" }
+      }
+    },
+    "parity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policy": { "enum": ["executor-phase-envelope/v1"] }
+      }
+    },
+    "resolvedString": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "resolvedOptionalString": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "type": "string" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "resolvedExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source"],
+      "properties": {
+        "value": { "enum": ["craftmake", "snakemake"] },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "resolvedBackend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source", "evidence"],
+      "properties": {
+        "value": { "enum": ["local", "slurm"] },
+        "source": { "$ref": "#/$defs/source" },
+        "evidence": { "$ref": "#/$defs/backendEvidence" }
+      }
+    },
+    "resolvedSlurmResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["partition", "account", "qos", "max_jobs", "default_time", "scratch_root"],
+      "properties": {
+        "partition": { "$ref": "#/$defs/resolvedString" },
+        "account": { "$ref": "#/$defs/resolvedString" },
+        "qos": { "$ref": "#/$defs/resolvedOptionalString" },
+        "max_jobs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "source"],
+          "properties": {
+            "value": { "type": "integer", "minimum": 0 },
+            "source": { "$ref": "#/$defs/source" }
+          }
+        },
+        "default_time": { "$ref": "#/$defs/resolvedOptionalString" },
+        "scratch_root": { "$ref": "#/$defs/resolvedOptionalString" }
+      }
+    },
+    "resolvedReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "id", "release", "registry_root", "manifest_digest", "fasta", "indexes"],
+      "properties": {
+        "role": { "enum": ["primary", "secondary", "graft", "host"] },
+        "id": { "type": "string", "minLength": 1 },
+        "release": { "type": "string", "minLength": 1 },
+        "organism": { "type": "string", "minLength": 1 },
+        "registry_root": { "type": "string", "pattern": "^/" },
+        "manifest_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "fasta": { "$ref": "#/$defs/resolvedAsset" },
+        "annotations": { "type": "array", "items": { "$ref": "#/$defs/resolvedAsset" } },
+        "indexes": { "type": "array", "items": { "$ref": "#/$defs/resolvedAsset" } }
+      }
+    },
+    "resolvedAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path", "sha256"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

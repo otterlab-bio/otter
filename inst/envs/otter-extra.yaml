@@ -1,0 +1,43 @@
+name: otter-extra
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # Python Core
+  - python=3.10.13
+  - numpy=1.24.4
+  - pandas
+
+  # Advanced Bioinformatics Tools
+  - bedtools
+  - bcftools
+  - vcftools
+  - tabix
+
+  # Statistical Analysis & Machine Learning
+  - scipy
+  - scikit-learn
+  - statsmodels
+
+  # Visualization & Dashboard
+  - plotly
+  - dash
+  - streamlit
+  - jupyter
+  - jupyterlab
+
+  # Web Frameworks & Data Processing
+  - flask
+  - requests
+  - beautifulsoup4
+  - openpyxl
+  - xlsxwriter
+
+  # Development Toolchain
+  - go
+  - rust
+
+  # Advanced ChIP-seq/ATAC-seq Tools
+  - deepTools=3.5.5       # Coverage analysis and visualization
+  - genrich=0.6           # ATAC-seq peak calling
+  - homer=4.11            # Peak annotation and motif analysis

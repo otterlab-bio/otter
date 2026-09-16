@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-samples-manifest-v1.schema.json",
+  "title": "Otter samples manifest v1",
+  "description": "Tab-separated samples manifest defining input FASTQ pairs for a project. Each row describes one sample with paired-end reads, optional group/batch metadata, and adapter sequences.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "description": "The samples manifest is a TSV file (tab-separated values), not JSON.",
+      "const": "tsv"
+    },
+    "encoding": {
+      "description": "UTF-8, Unix line endings (LF).",
+      "const": "utf-8"
+    },
+    "delimiter": {
+      "const": "\t"
+    },
+    "columns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_id", "r1", "r2"],
+      "properties": {
+        "sample_id": {
+          "description": "Unique sample identifier. Must match ^[A-Za-z0-9][A-Za-z0-9._-]*$.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "r1": {
+          "description": "Absolute or project-relative path to the mate 1 FASTQ file (required, paired-end).",
+          "type": "string",
+          "minLength": 1
+        },
+        "r2": {
+          "description": "Absolute or project-relative path to the mate 2 FASTQ file (required, paired-end).",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "description": "Optional experimental group label (e.g. treated, control).",
+          "type": "string"
+        },
+        "batch": {
+          "description": "Optional sequencing batch identifier.",
+          "type": "string"
+        },
+        "adapter_r1": {
+          "description": "Optional adapter sequence for mate 1 (overrides workflow default).",
+          "type": "string"
+        },
+        "adapter_r2": {
+          "description": "Optional adapter sequence for mate 2 (overrides workflow default).",
+          "type": "string"
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unique_sample_ids": {
+          "description": "Every sample_id must be unique within the manifest.",
+          "const": true
+        },
+        "non_empty_samples": {
+          "description": "The manifest must contain at least one sample record.",
+          "const": true
+        },
+        "strict_columns": {
+          "description": "Unknown columns are rejected; only the canonical column set is allowed.",
+          "const": true
+        },
+        "no_trailing_empty_lines": {
+          "description": "Empty lines within the body are skipped; a truly empty manifest is rejected.",
+          "const": true
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "filename": "samples.tsv",
+      "content": "sample_id\tr1\tr2\tgroup\tbatch\tadapter_r1\tadapter_r2\nS01\tdata/S01_R1.fastq.gz\tdata/S01_R2.fastq.gz\ttreated\tbatch1\tAGATCGGAAGAGC\tAGATCGGAAGAGC\nS02\tdata/S02_R1.fastq.gz\tdata/S02_R2.fastq.gz\tcontrol\tbatch1\tAGATCGGAAGAGC\tAGATCGGAAGAGC\n"
+    }
+  ]
+}

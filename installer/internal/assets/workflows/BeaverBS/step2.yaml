@@ -1,0 +1,88 @@
+name: BeaverBS step2
+version: 1
+on:
+  otter:
+    workflow: BeaverBS
+    phase: step2
+    modes: [RRBS, WGBS, BSSEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  map_and_sort:
+    name: Bismark mapping and BAM preparation
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      read1: "${{ config.output.trim_dir }}/${{ sample.id }}_val_1.fq.gz"
+      read2: "${{ config.output.trim_dir }}/${{ sample.id }}_val_2.fq.gz"
+      genome_index: "${{ species.genome_index }}"
+    outputs:
+      bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam"
+      bam_index: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam.bai"
+    resources:
+      cores: 40
+      memory: 160G
+      partition: amd_512
+    steps:
+      - name: Run Bismark
+        run: |
+          output_directory='${{ config.directories.bsmap.main }}/${{ species.name }}'
+          temporary_directory='${{ config.directories.bsmap.main }}/tmp/${{ species.name }}'
+          mkdir -p "$output_directory" "$temporary_directory" "$(dirname '${{ outputs.bam }}')"
+          bismark --genome '${{ inputs.genome_index }}' --nucleotide_coverage --parallel 8 -1 '${{ inputs.read1 }}' -2 '${{ inputs.read2 }}' -o "$output_directory" --temp_dir "$temporary_directory"
+      - name: Sort and index BAM
+        run: |
+          aligned_bam='${{ config.directories.bsmap.main }}/${{ species.name }}/${{ sample.id }}_val_1_bismark_bt2_pe.bam'
+          samtools sort -@ '${{ resources.cores }}' -o '${{ outputs.bam }}' "$aligned_bam"
+          samtools index -@ '${{ resources.cores }}' -b '${{ outputs.bam }}'
+
+  qualimap:
+    name: Qualimap BAM quality control
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      bam: "${{ jobs.map_and_sort.outputs.bam }}"
+    outputs:
+      html: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/qualimapReport.html"
+      pdf: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/report.pdf"
+    resources:
+      cores: 2
+      memory: 40G
+      partition: amd_512
+    env:
+      JAVA_OPTS: -Djava.awt.headless=true
+    steps:
+      - name: Run Qualimap
+        run: |
+          mkdir -p '${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}'
+          qualimap bamqc -bam '${{ inputs.bam }}' -outdir '${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}' -outformat PDF:HTML --java-mem-size=40G
+
+  collect_gc_bias:
+    name: Collect GC bias metrics
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      bam: "${{ jobs.map_and_sort.outputs.bam }}"
+      reference: "${{ species.genome_fasta }}"
+    outputs:
+      metrics: "${{ config.directories.qc.main }}/GCbias/${{ sample.id }}_${{ species.name }}/gc_bias_metrics.txt"
+      chart: "${{ config.directories.qc.main }}/GCbias/${{ sample.id }}_${{ species.name }}/gc_bias_metrics.pdf"
+      summary: "${{ config.directories.qc.main }}/GCbias/${{ sample.id }}_${{ species.name }}/summary_metrics.txt"
+    resources:
+      cores: 2
+      memory: 16G
+      partition: amd_512
+    steps:
+      - name: Run Picard CollectGcBiasMetrics
+        run: |
+          mkdir -p "$(dirname '${{ outputs.metrics }}')"
+          if [ -n "${CONDA_PREFIX:-}" ] && [ -x "${CONDA_PREFIX}/lib/jvm/bin/java" ]; then
+            export JAVA_HOME="${CONDA_PREFIX}/lib/jvm"
+          fi
+          picard CollectGcBiasMetrics I='${{ inputs.bam }}' O='${{ outputs.metrics }}' CHART='${{ outputs.chart }}' S='${{ outputs.summary }}' R='${{ inputs.reference }}'

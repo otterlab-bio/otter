@@ -1,0 +1,3 @@
+schema_version: otter.project.lock/v1
+release:
+  id: toolchain-comparison-20260815T070000Z

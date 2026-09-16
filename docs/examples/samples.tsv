@@ -1,0 +1,2 @@
+sample_id	r1	r2	group	batch	adapter_r1	adapter_r2
+S01	data/S01_R1.fastq.gz	data/S01_R2.fastq.gz	case	B1	AUTO	AUTO

@@ -1,0 +1,4 @@
+样本ID,barcode,分组
+sample1,ATCG,control
+sample2,,treatment
+sample3,GCTA,control

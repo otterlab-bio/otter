@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-references-lock-v1.schema.json",
+  "title": "Otter project reference lock v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "references"],
+  "properties": {
+    "schema_version": { "const": "otter.references.lock/v1" },
+    "references": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/lockedReference" },
+      "propertyNames": { "pattern": "^[A-Za-z0-9._-]+$" }
+    },
+    "promoted_from_run_id": {
+      "type": "string",
+      "pattern": "^run-[0-9]{8}T[0-9]{6}Z-[a-z]{6}$"
+    }
+  },
+  "$defs": {
+    "lockedReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "release", "manifest_digest"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "release": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "manifest_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

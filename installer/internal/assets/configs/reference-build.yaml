@@ -1,0 +1,29 @@
+reference_build:
+  run_id: reference-build-template
+  backend: local
+  partition: ""
+  reference_id: reference-template
+  release: release-template
+  organism: Organism name
+  assembly: Assembly name
+  aliases: reference-template
+  cache_dir: /tmp/otter-reference-build/cache
+  work_dir: /tmp/otter-reference-build/work
+  registry_root: /tmp/otter-references
+  evidence_dir: /tmp/otter-reference-build/evidence
+  fasta_url: https://example.invalid/reference.fa.gz
+  fasta_filename: reference.fa.gz
+  fasta_checksum_algorithm: md5
+  fasta_checksum_value: 00000000000000000000000000000000
+  gtf_url: https://example.invalid/reference.gtf.gz
+  gtf_filename: reference.gtf.gz
+  gtf_checksum_algorithm: md5
+  gtf_checksum_value: 00000000000000000000000000000000
+  contigs: '*'
+  star_sjdb_overhang: 149
+  index_build_threads: 16
+  otter_binary: /usr/local/bin/otter
+  samtools_binary: /usr/local/bin/samtools
+  bismark_binary: /usr/local/bin/bismark_genome_preparation
+  bowtie2_binary: /usr/local/bin/bowtie2-build
+  star_binary: /usr/local/bin/STAR

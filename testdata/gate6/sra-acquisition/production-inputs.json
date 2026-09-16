@@ -1,0 +1,48 @@
+{
+  "schema_version": "otter.sra-acquisition/v1",
+  "acquisition": {
+    "id": "sra-20260812T130000Z-fixture",
+    "created_at": "2026-08-12T13:00:00Z",
+    "immutable": true,
+    "root": "/immutable/sra-20260812T130000Z-fixture"
+  },
+  "entries": [
+    {
+      "scenario": "rrbs",
+      "accession": "SRR31480456",
+      "download": {
+        "path": "/immutable/sra-20260812T130000Z-fixture/archive/SRR31480456.sra",
+        "sha256": "sha256:39ef271b60fd224e8bbf026cea1f812950c322da626961cdd74b3f6ea1d93c76",
+        "bytes": 3109362710,
+        "md5": "499ec5422c8bad0b6c6ae567e38690bf"
+      },
+      "output": {
+        "r1": {
+          "path": "/immutable/sra-20260812T130000Z-fixture/fastq/SRR31480456/SRR31480456_1.fastq.gz",
+          "sha256": "sha256:39ef271b60fd224e8bbf026cea1f812950c322da626961cdd74b3f6ea1d93c76",
+          "bytes": 2042420660,
+          "paired_record_count": 28865648
+        },
+        "r2": {
+          "path": "/immutable/sra-20260812T130000Z-fixture/fastq/SRR31480456/SRR31480456_2.fastq.gz",
+          "sha256": "sha256:e25778f0b6a02e789e301c2e03708929ac6769ff638555fe24f6ce6b5ea0f367",
+          "bytes": 2199379131,
+          "paired_record_count": 28865648
+        }
+      },
+      "reference": {
+        "primary": {
+          "role": "primary",
+          "id": "hg19",
+          "release": "GRCh37.p13-gencode-v19",
+          "manifest_sha256": "sha256:33dfd7d4ec0a90c6e11fdc45d02b2d4e9b6d82e4a607148d1ab467a0e555accc"
+        }
+      },
+      "tool": {
+        "name": "sra-tools",
+        "version": "3.1.1",
+        "command": "prefetch SRR31480456 && fasterq-dump --split-files SRR31480456"
+      }
+    }
+  ]
+}

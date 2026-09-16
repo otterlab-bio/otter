@@ -1,0 +1,69 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["qc"]["before"], "{sample}_R1_fastqc.zip"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["before"], "{sample}_R2_fastqc.zip"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["before"], "{sample}_R1_fastqc.html"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["before"], "{sample}_R2_fastqc.html"), sample=SIDs),
+    expand(os.path.join(config["output"]["trim_dir"], "{sample}_val_1.fq.gz"),sample = SIDs),
+    expand(os.path.join(config["output"]["trim_dir"], "{sample}_val_2.fq.gz"),sample = SIDs),
+    expand(os.path.join(config["output"]["trim_dir"], "{sample}_R1.fastq.gz_trimming_report.txt"),sample = SIDs),
+    expand(os.path.join(config["output"]["trim_dir"], "{sample}_R2.fastq.gz_trimming_report.txt"),sample = SIDs),
+    expand(os.path.join(config["directories"]["qc"]["after"], "{sample}_val_1_fastqc.zip"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["after"], "{sample}_val_2_fastqc.zip"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["after"], "{sample}_val_1_fastqc.html"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["after"], "{sample}_val_2_fastqc.html"), sample=SIDs),
+    expand(os.path.join(config["directories"]["qc"]["main"], "{sample}_seqkit_stat.txt"), sample=SIDs) ,
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_{species}.bam"), sample=SIDs,species = species) ,
+    expand(os.path.join(config["outdir_qualimap"],"{sample}_{species}","qualimapReport.html") , sample=SIDs,species = species) ,
+    expand(os.path.join(config["outDir_mCall"], "{sample}_{species}"+".txt"), sample=SIDs,species = species),
+    os.path.join(config["outDir_betaM"], "matrix_count.txt"),
+    os.path.join(config["outDir_betaM"], "matrix_norm.txt"),
+    os.path.join(config["qc_summary"],"qc_summary.txt"),
+    os.path.join(config["directories"]["bsmap"]["main"], "RNASplicing", "splicing-outcome.json")
+
+# 第一次QC
+include: "rules/01fastqcAtfirst.smk"
+
+# Trim
+include: "rules/02fastq2trim.smk"
+
+# 第二次QC
+include: "rules/03-0-fastqcAtclean.smk"
+
+#seqkit
+
+include: "rules/03-1-seqkit.smk"
+
+
+# STAR mapping
+
+include: "rules/rnaseq_mapping.smk"
+
+# qualimap
+
+include:"rules/05-3-qualimap.smk"
+
+# build matrix
+
+include:"rules/rnaseq_htseq.smk"
+
+# RNA Splicing
+
+include:"rules/rnaseq_splicing.smk"
+
+# construct matrix
+
+include:"rules/rnaseq_matrix.smk"
+
+# qc summary
+
+include:"rules/rna_qc_summary.smk"
+
+
+
+

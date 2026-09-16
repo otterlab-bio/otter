@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-reference-v1.schema.json",
+  "title": "Otter reference registry entry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "reference", "assets", "compatibility"],
+  "properties": {
+    "schema_version": { "const": "otter.reference/v1" },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "release", "organism", "assembly"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "release": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+        "organism": { "type": "string", "minLength": 1 },
+        "assembly": { "type": "string", "minLength": 1 },
+        "aliases": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fasta", "indexes"],
+      "properties": {
+        "fasta": { "$ref": "#/$defs/fasta" },
+        "annotations": { "type": "array", "items": { "$ref": "#/$defs/annotation" } },
+        "indexes": { "type": "array", "items": { "$ref": "#/$defs/index" } }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenarios"],
+      "properties": {
+        "scenarios": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["rrbs", "wgbs", "rnaseq", "bs-pdx", "rna-pdx"] }
+        },
+        "workflows": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "relativePath": { "type": "string", "minLength": 1, "not": { "pattern": "^(?:/|.*(?:^|/)\\.\\.(?:/|$))" } },
+    "fasta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "fai"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "fai": { "$ref": "#/$defs/relativePath" }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "path", "sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["gtf", "gff", "bed", "cpg-sites", "cgi"] },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path", "reference_fasta_sha256", "tool", "tool_version", "manifest_sha256"],
+      "properties": {
+        "type": { "enum": ["bismark", "bowtie2", "star", "bwa"] },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "reference_fasta_sha256": { "$ref": "#/$defs/digest" },
+        "tool": { "type": "string", "minLength": 1 },
+        "tool_version": { "type": "string", "minLength": 1 },
+        "parameters": { "type": "object" },
+        "manifest_sha256": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

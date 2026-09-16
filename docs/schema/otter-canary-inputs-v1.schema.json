@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://otter.dev/schema/otter-canary-inputs-v1.schema.json",
+  "title": "Otter Canary Inputs v1",
+  "description": "Immutable, paired FASTQ inputs derived from a checksum-verified source pair through deterministic selection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario",
+    "accession",
+    "selection",
+    "source",
+    "output",
+    "reference",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {"const": "otter.canary-inputs/v1"},
+    "scenario": {"enum": ["rrbs", "rnaseq", "bs-pdx", "rna-pdx"]},
+    "accession": {"type": "string", "pattern": "^SRR[0-9]+$"},
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "seed", "modulus", "remainder", "paired_record_count"],
+      "properties": {
+        "algorithm": {"const": "sha256-qname-modulus/v1"},
+        "seed": {"type": "string", "minLength": 16},
+        "modulus": {"type": "integer", "minimum": 1},
+        "remainder": {"type": "integer", "minimum": 0},
+        "paired_record_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "source": {"$ref": "#/$defs/fastq_pair"},
+    "output": {"$ref": "#/$defs/fastq_pair"},
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_id", "release", "manifest_sha256"],
+      "properties": {
+        "primary_id": {"type": "string", "minLength": 1},
+        "release": {"type": "string", "minLength": 1},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "species": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "id", "release", "manifest_sha256"],
+            "properties": {
+              "role": {"enum": ["graft", "host"]},
+              "id": {"type": "string", "minLength": 1},
+              "release": {"type": "string", "minLength": 1},
+              "manifest_sha256": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_at", "generator", "workflow_digest"],
+      "properties": {
+        "created_at": {"type": "string", "format": "date-time"},
+        "generator": {"type": "string", "minLength": 1},
+        "workflow_digest": {"$ref": "#/$defs/sha256"},
+        "run_snapshot_digest": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "fastq_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["r1", "r2"],
+      "properties": {
+        "r1": {"$ref": "#/$defs/fastq_file"},
+        "r2": {"$ref": "#/$defs/fastq_file"}
+      }
+    },
+    "fastq_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,196 @@
+name: BeaverRNA step2 check
+version: 1
+on:
+  otter:
+    workflow: BeaverRNA
+    phase: step2-check
+    modes: [RNASEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  sample_artifacts:
+    name: Validate BeaverRNA step1 and step2 artifacts
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      counts: "${{ config.directories.methylation_call }}/${{ sample.id }}_${{ species.name }}.txt"
+      sorted_bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam"
+      qualimap_report: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/qualimapReport.html"
+      trim_report_r1: "${{ config.output.trim_dir }}/${{ sample.id }}_R1.fastq.gz_trimming_report.txt"
+      trim_report_r2: "${{ config.output.trim_dir }}/${{ sample.id }}_R2.fastq.gz_trimming_report.txt"
+      fastqc_before_r1: "${{ config.directories.qc.before }}/${{ sample.id }}_R1_fastqcx/fastqc_data.txt"
+      fastqc_before_r2: "${{ config.directories.qc.before }}/${{ sample.id }}_R2_fastqcx/fastqc_data.txt"
+      fastqc_after_r1: "${{ config.directories.qc.after }}/${{ sample.id }}_val_1_fastqcx/fastqc_data.txt"
+      fastqc_after_r2: "${{ config.directories.qc.after }}/${{ sample.id }}_val_2_fastqcx/fastqc_data.txt"
+    outputs:
+      ready: "${{ config.directories.sid_log }}/step2-check/${{ sample.id }}_${{ species.name }}.ready"
+    resources:
+      cores: 1
+      memory: 1G
+      partition: amd_512
+    steps:
+      - name: Write validated BeaverRNA step2 artifact manifest
+        run: |
+          output_path='${{ outputs.ready }}'
+          mkdir -p "$(dirname "$output_path")"
+          temporary_path="$(mktemp "${output_path}.tmp.XXXXXX")"
+          trap 'rm -f "$temporary_path"' EXIT
+
+          ensure_json_safe_string() {
+            local value="$1"
+            if printf '%s' "$value" | LC_ALL=C grep -q '[[:cntrl:]"\\]'; then
+              printf 'validated artifact metadata contains unsupported JSON characters: %s\n' "$value" >&2
+              exit 1
+            fi
+          }
+
+          write_artifact() {
+            local artifact_id="$1"
+            local artifact_path="$2"
+            local media_type="$3"
+            ensure_json_safe_string "$artifact_id"
+            ensure_json_safe_string "$artifact_path"
+            ensure_json_safe_string "$media_type"
+            if [[ -L "$artifact_path" || ! -f "$artifact_path" ]]; then
+              printf 'validated artifact must be a regular non-symlink file: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            local size_bytes sha256
+            size_bytes="$(wc -c < "$artifact_path" | tr -d '[:space:]')"
+            if [[ ! "$size_bytes" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'validated artifact must be non-empty: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            sha256="$(sha256sum -- "$artifact_path" | awk '{print $1}')"
+            if [[ ! "$sha256" =~ ^[a-f0-9]{64}$ ]]; then
+              printf 'could not calculate SHA-256 for validated artifact: %s\n' "$artifact_path" >&2
+              exit 1
+            fi
+            printf '{"id":"%s","path":"%s","media_type":"%s","size_bytes":%s,"sha256":"%s"}' \
+              "$artifact_id" "$artifact_path" "$media_type" "$size_bytes" "$sha256"
+          }
+
+          ensure_json_safe_string '${{ sample.id }}'
+          ensure_json_safe_string '${{ species.name }}'
+          {
+            printf '{"schema_version":"otter.sample-artifacts-validation/v1","status":"validated","workflow":"BeaverRNA","phase":"step2-check","sample_id":"%s","dimensions":{"sample":"%s","species":"%s"},"artifacts":[' '${{ sample.id }}' '${{ sample.id }}' '${{ species.name }}'
+            first_artifact=true
+            for artifact in \
+              "counts|${{ inputs.counts }}|text/plain" \
+              "sorted_bam|${{ inputs.sorted_bam }}|application/x-bam" \
+              "qualimap_report|${{ inputs.qualimap_report }}|text/html" \
+              "trim_report_r1|${{ inputs.trim_report_r1 }}|text/plain" \
+              "trim_report_r2|${{ inputs.trim_report_r2 }}|text/plain" \
+              "fastqc_before_r1|${{ inputs.fastqc_before_r1 }}|text/plain" \
+              "fastqc_before_r2|${{ inputs.fastqc_before_r2 }}|text/plain" \
+              "fastqc_after_r1|${{ inputs.fastqc_after_r1 }}|text/plain" \
+              "fastqc_after_r2|${{ inputs.fastqc_after_r2 }}|text/plain"; do
+              IFS='|' read -r artifact_id artifact_path media_type <<< "$artifact"
+              if ! "$first_artifact"; then printf ','; fi
+              write_artifact "$artifact_id" "$artifact_path" "$media_type"
+              first_artifact=false
+            done
+            printf ']}\n'
+          } > "$temporary_path"
+          mv -f "$temporary_path" "$output_path"
+          trap - EXIT
+
+  construct_expression_matrix:
+    name: Construct BeaverRNA expression matrices
+    scope: global
+    dimensions: []
+    inputs:
+      sample_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+    outputs:
+      count_matrix: "${{ config.directories.beta_matrix }}/matrix_count.txt"
+      normalized_matrix: "${{ config.directories.beta_matrix }}/matrix_norm.txt"
+    resources:
+      cores: 5
+      memory: 8G
+      partition: amd_512
+    steps:
+      - name: Build expression matrices
+        run: |
+          mkdir -p '${{ config.directories.beta_matrix }}'
+          seq2mat --htseq_dir '${{ config.directories.methylation_call }}' --output_dir '${{ config.directories.beta_matrix }}' --postfix '_${{ config.workflow.species.graft }}.txt' --species '${{ config.workflow.species.expression }}'
+
+  rnaseq_splicing:
+    name: Run BeaverRNA splicing analysis
+    scope: global
+    dimensions: []
+    inputs:
+      sample_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+      annotation: "${{ config.reference.rnaseq.primary_gtf }}"
+    outputs:
+      outcome: "${{ config.directories.bsmap.main }}/RNASplicing/splicing-outcome.json"
+    resources:
+      cores: 20
+      memory: 32G
+      partition: amd_512
+    steps:
+      - name: Run or classify RNA splicing
+        run: |
+          splicing_directory='${{ config.directories.bsmap.main }}/RNASplicing'
+          outcome_path='${{ outputs.outcome }}'
+          mkdir -p "$splicing_directory"
+          if [ '${{ config.metadata.group_levels }}' -ge 2 ]; then
+            matsrun run --root '${{ config.directories.bsmap.main }}' --threads '${{ resources.cores }}' --pdata '${{ config.directories.selfconfig }}/pdata.xlsx' --seqlengthQC '${{ config.directories.qc.main }}' --gtf '${{ inputs.annotation }}' --pdxmode 0
+            mapfile -t artifact_paths < <(find "$splicing_directory" -type f ! -name 'splicing-outcome.json' -printf '%P\n' | sort)
+            if [ "${#artifact_paths[@]}" -eq 0 ]; then
+              printf 'matsrun reported success but produced no splicing artifacts in %s\n' "$splicing_directory" >&2
+              exit 1
+            fi
+            python - "$outcome_path" "$splicing_directory" "${artifact_paths[@]}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          outcome_path = pathlib.Path(sys.argv[1])
+          outcome = {
+              "schema_version": "otter.rna-splicing-outcome/v1",
+              "status": "produced",
+              "source_root": sys.argv[2],
+              "artifact_paths": sys.argv[3:],
+          }
+          outcome_path.write_text(json.dumps(outcome, indent=2) + "\n", encoding="utf-8")
+          PY
+          else
+            python - "$outcome_path" "$splicing_directory" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          outcome = {
+              "schema_version": "otter.rna-splicing-outcome/v1",
+              "status": "not_applicable",
+              "source_root": sys.argv[2],
+              "artifact_paths": [],
+          }
+          pathlib.Path(sys.argv[1]).write_text(json.dumps(outcome, indent=2) + "\n", encoding="utf-8")
+          PY
+          fi
+
+  qc_summary:
+    name: Build BeaverRNA QC summary
+    scope: global
+    dimensions: []
+    inputs:
+      sample_artifacts: "${{ jobs.sample_artifacts.outputs.ready }}"
+      run_config: "${{ paths.config }}"
+    outputs:
+      report: "${{ config.directories.qc_summary }}/qc_summary.xlsx"
+    resources:
+      cores: 5
+      memory: 8G
+      partition: amd_512
+    steps:
+      - name: Run RNA-seq QC summary
+        run: |
+          mkdir -p '${{ config.directories.qc_summary }}'
+          qctb --config '${{ inputs.run_config }}' --output '${{ outputs.report }}' --rnaseq

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://otter.dev/schema/otter-rna-splicing-outcome-v1.schema.json",
+  "title": "Otter RNA splicing outcome v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "source_root", "artifact_paths"],
+  "properties": {
+    "schema_version": {
+      "const": "otter.rna-splicing-outcome/v1"
+    },
+    "status": {
+      "enum": ["produced", "not_applicable"]
+    },
+    "source_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "produced"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "artifact_paths": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "not_applicable"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "artifact_paths": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}

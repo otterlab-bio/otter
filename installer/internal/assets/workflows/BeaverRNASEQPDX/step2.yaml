@@ -1,0 +1,72 @@
+name: BeaverRNASEQPDX step2
+version: 1
+on:
+  otter:
+    workflow: BeaverRNASEQPDX
+    phase: step2
+    modes: [RNASEQ]
+defaults:
+  shell: bash
+  environment: otter-core
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  map_and_sort:
+    name: STAR mapping and BAM preparation by species
+    scope: batch
+    dimensions: [sample, species]
+    group_by: [species]
+    inputs:
+      read1: "${{ config.output.trim_dir }}/${{ sample.id }}_val_1.fq.gz"
+      read2: "${{ config.output.trim_dir }}/${{ sample.id }}_val_2.fq.gz"
+      genome_directory: "${{ species.rnaseq_reference }}"
+    outputs:
+      bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam"
+      bam_index: "${{ config.directories.bsmap.main }}/${{ sample.id }}_${{ species.name }}.bam.bai"
+    resources:
+      cores: 80
+      memory: 160G
+      partition: amd_512
+    worker:
+      resources:
+        cores: 40
+        memory: 64G
+        partition: amd_512
+      max_parallel: 2
+    steps:
+      - name: Run STAR
+        run: |
+          species_directory='${{ config.directories.bsmap.main }}/${{ species.name }}'
+          output_prefix="$species_directory/${{ sample.id }}"
+          mkdir -p "$species_directory" '${{ config.directories.bsmap.main }}/tmp/${{ sample.id }}'
+          STAR --runThreadN '${{ worker.resources.cores }}' --readFilesCommand zcat --quantMode GeneCounts --genomeDir '${{ inputs.genome_directory }}' --readFilesIn '${{ inputs.read1 }}' '${{ inputs.read2 }}' --twopassMode Basic --outSAMunmapped None --outSAMtype BAM SortedByCoordinate --outSAMattributes NH HI AS nM NM MD --outFileNamePrefix "$output_prefix"
+      - name: Sort and index STAR BAM
+        run: |
+          aligned_bam='${{ config.directories.bsmap.main }}/${{ species.name }}/${{ sample.id }}Aligned.sortedByCoord.out.bam'
+          mv "$aligned_bam" '${{ outputs.bam }}'
+          samtools index -@ 8 '${{ outputs.bam }}'
+
+  qualimap:
+    name: Qualimap RNA-seq PDX BAM quality control
+    scope: sample
+    dimensions: [sample, species]
+    inputs:
+      bam: "${{ jobs.map_and_sort.outputs.bam }}"
+    outputs:
+      html: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/qualimapReport.html"
+      pdf: "${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}/report.pdf"
+    resources:
+      cores: 2
+      memory: 40G
+      partition: amd_512
+    env:
+      JAVA_OPTS: -Djava.awt.headless=true
+    steps:
+      - name: Run Qualimap
+        run: |
+          output_directory='${{ config.directories.qualimap }}/${{ sample.id }}_${{ species.name }}'
+          mkdir -p "$output_directory"
+          qualimap bamqc -bam '${{ inputs.bam }}' -outdir "$output_directory" -outformat PDF:HTML --java-mem-size=40G

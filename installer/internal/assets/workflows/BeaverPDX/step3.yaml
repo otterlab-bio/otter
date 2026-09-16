@@ -1,0 +1,42 @@
+name: BeaverPDX step3
+version: 1
+on:
+  otter:
+    workflow: BeaverPDX
+    phase: step3
+    modes: [RRBS, WGBS, BSSEQ]
+defaults:
+  shell: bash
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  extract_methylation:
+    name: Extract PDX graft methylation calls
+    scope: sample
+    dimensions: [sample]
+    inputs:
+      filtered_bam: "${{ config.directories.bsmap.main }}/Filtered_bams/${{ sample.id }}_fixed_${{ config.workflow.species.graft }}_Filtered.bam"
+    outputs:
+      name_sorted_bam: "${{ config.directories.bsmap.main }}/${{ sample.id }}_nsort.bam"
+      coverage: "${{ config.directories.methylation_call }}/${{ sample.id }}_nsort.bismark.cov.gz"
+    resources:
+      cores: 20
+      memory: 48G
+      partition: amd_512
+    steps:
+      - name: Sort filtered BAM by read name
+        environment: otter-core
+        run: |
+          mkdir -p "$(dirname '${{ outputs.name_sorted_bam }}')" '${{ config.directories.methylation_call }}'
+          samtools sort -@ '${{ resources.cores }}' -n -o '${{ outputs.name_sorted_bam }}.tmp.bam' '${{ inputs.filtered_bam }}'
+      - name: Retain paired reads
+        run: |
+          pairbam '${{ outputs.name_sorted_bam }}.tmp.bam' '${{ outputs.name_sorted_bam }}'
+          rm -f '${{ outputs.name_sorted_bam }}.tmp.bam'
+      - name: Extract methylation calls
+        environment: otter-core
+        run: |
+          bismark_methylation_extractor --paired-end --gzip --output_dir '${{ config.directories.methylation_call }}' --comprehensive --merge_non_CpG --bedGraph --multicore 8 --buffer_size 20G '${{ outputs.name_sorted_bam }}'

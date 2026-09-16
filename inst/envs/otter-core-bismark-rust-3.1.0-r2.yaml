@@ -1,0 +1,30 @@
+name: otter-core-bismark-rust-3.1.0-r2
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # Bismark Rust 3.1.0 is built statically from upstream source tag
+  # bismark-rust-v3.1.0 (commit e552b8f307a7041bcebed8f8e5a764ebcf7b046c).
+  # The vendor x86_64 asset requires glibc 2.39 and is incompatible with Paracloud 2.17.
+  # Do not add the legacy Perl `bismark` Conda package.
+  - python=3.8.18
+  - numpy=1.24.4
+  - pandas
+  - fastqc
+  - multiqc=1.19
+  - seqkit
+  - seqtk
+  - qualimap
+  - trim-galore
+  - samtools=1.15.1
+  - hdf5
+  - star
+  - htseq=2.0.3
+  - rmats=4.1.2
+  - picard
+  - macs2=2.2.7.1
+  - bwa=0.7.17
+  # Bowtie2 is supplied by the checksum-pinned upstream Linux release asset:
+  # tag v2.5.4, SHA-256 32de7d9363124452296d45d7cb7da48d41c60e9ebaeebd2feafe1cc0418ae00c.
+  # Do not add the Conda Bowtie2 package to this environment.
+  - pyyaml

@@ -1,0 +1,165 @@
+name: BeaverRNA publish
+version: 1
+on:
+  otter:
+    workflow: BeaverRNA
+    phase: publish
+    modes: [RNASEQ]
+defaults:
+  shell: bash
+  observability:
+    metrics: task
+    capture_stdout: true
+    capture_stderr: true
+    compress_success_logs: true
+jobs:
+  publish_artifacts:
+    name: Publish immutable BeaverRNA artifacts
+    scope: global
+    dimensions: []
+    inputs:
+      count_matrix: "${{ config.directories.beta_matrix }}/matrix_count.txt"
+      normalized_matrix: "${{ config.directories.beta_matrix }}/matrix_norm.txt"
+      qc_summary: "${{ config.directories.qc_summary }}/qc_summary.xlsx"
+      splicing_outcome: "${{ config.directories.bsmap.main }}/RNASplicing/splicing-outcome.json"
+    outputs:
+      declarations: "${{ paths.work }}/publish/beaverrna-artifacts.json"
+      manifest: "${{ paths.results }}/artifacts.json"
+    resources:
+      cores: 1
+      memory: 1G
+      partition: amd_512
+    steps:
+      - name: Stage typed splicing artifacts and publish RNA-seq results
+        run: |
+          results_root='${{ paths.results }}'
+          final_splicing_directory="$results_root/splicing"
+          staging_parent="$results_root/.publish-staging"
+          declaration_path='${{ outputs.declarations }}'
+          manifest_path='${{ outputs.manifest }}'
+          otter_cli="${OTTER:-otter}"
+
+          if [ -e "$manifest_path" ]; then
+            "$otter_cli" artifact verify '${{ paths.config }}'
+            exit 0
+          fi
+
+          mkdir -p "$staging_parent" "$(dirname "$declaration_path")"
+          staging_root="$(mktemp -d "$staging_parent/rna.XXXXXX")"
+          trap 'rm -rf "$staging_root"' EXIT
+          staging_splicing_directory="$staging_root/splicing"
+          python - '${{ inputs.splicing_outcome }}' "$staging_splicing_directory" "$declaration_path" <<'PY'
+          import json
+          import os
+          import pathlib
+          import shutil
+          import sys
+
+          outcome_path = pathlib.Path(sys.argv[1])
+          destination_root = pathlib.Path(sys.argv[2])
+          declaration_path = pathlib.Path(sys.argv[3])
+          outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+          expected_keys = {"schema_version", "status", "source_root", "artifact_paths"}
+          if set(outcome) != expected_keys or outcome["schema_version"] != "otter.rna-splicing-outcome/v1":
+              raise SystemExit("invalid RNA splicing outcome document")
+          if outcome["status"] not in {"produced", "not_applicable"}:
+              raise SystemExit("invalid RNA splicing outcome status")
+          if not isinstance(outcome["artifact_paths"], list):
+              raise SystemExit("RNA splicing outcome artifact_paths must be an array")
+          if outcome["status"] == "produced" and not outcome["artifact_paths"]:
+              raise SystemExit("produced RNA splicing outcome requires artifact paths")
+          if outcome["status"] == "not_applicable" and outcome["artifact_paths"]:
+              raise SystemExit("not_applicable RNA splicing outcome must not declare artifact paths")
+          source_root = pathlib.Path(outcome["source_root"]).resolve()
+          if not source_root.is_dir():
+              raise SystemExit(f"RNA splicing source root does not exist: {source_root}")
+          destination_root.mkdir(parents=True)
+          shutil.copy2(outcome_path, destination_root / "outcome.json")
+          declared_artifacts = [
+              {
+                  "id": "expression-count-matrix",
+                  "path": "methylation/matrix_count.txt",
+                  "media_type": "text/tab-separated-values",
+                  "schema": "otter.expression-count-matrix/v1",
+                  "comparison": {"tier": "scientific", "comparator": "expression-count-matrix/v1"},
+              },
+              {
+                  "id": "expression-normalized-matrix",
+                  "path": "methylation/matrix_norm.txt",
+                  "media_type": "text/tab-separated-values",
+                  "schema": "otter.expression-normalized-matrix/v1",
+                  "comparison": {"tier": "scientific", "comparator": "expression-count-matrix/v1"},
+              },
+              {
+                  "id": "qc-summary",
+                  "path": "qc/qc_summary.xlsx",
+                  "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  "schema": "otter.qc-summary/v1",
+                  "comparison": {"tier": "structural", "comparator": "xlsx-structure/v1"},
+              },
+              {
+                  "id": "splicing-outcome",
+                  "path": "splicing/outcome.json",
+                  "media_type": "application/json",
+                  "schema": "otter.rna-splicing-outcome/v1",
+                  "comparison": {"tier": "structural", "comparator": "rna-splicing-outcome/v1"},
+              },
+          ]
+          for artifact_index, relative_path in enumerate(sorted(outcome["artifact_paths"]), start=1):
+              relative_artifact = pathlib.PurePosixPath(relative_path)
+              if relative_artifact.is_absolute() or ".." in relative_artifact.parts:
+                  raise SystemExit(f"unsafe RNA splicing artifact path: {relative_path}")
+              source_path = (source_root / relative_artifact).resolve()
+              if not source_path.is_file() or source_root not in source_path.parents:
+                  raise SystemExit(f"RNA splicing artifact is not a regular source file: {relative_path}")
+              target_path = destination_root / "files" / relative_artifact
+              target_path.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source_path, target_path)
+              declared_artifacts.append({
+                  "id": f"splicing-output-{artifact_index:04d}",
+                  "path": f"splicing/files/{relative_artifact.as_posix()}",
+                  "media_type": "application/octet-stream",
+                  "schema": "otter.rna-splicing-output/v1",
+                  "comparison": {"tier": "exact", "comparator": "exact-file/v1"},
+              })
+          temporary_declaration_path = declaration_path.with_suffix(declaration_path.suffix + ".tmp")
+          temporary_declaration_path.write_text(json.dumps({
+              "schema_version": "otter.artifact-declarations/v1",
+              "artifacts": declared_artifacts,
+          }, indent=2) + "\n", encoding="utf-8")
+          os.replace(temporary_declaration_path, declaration_path)
+          PY
+
+          if [ -e "$final_splicing_directory" ]; then
+            python - "$staging_splicing_directory" "$final_splicing_directory" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          def digest_tree(root):
+              entries = []
+              for candidate in sorted(root.rglob("*")):
+                  if candidate.is_symlink() or not candidate.is_file():
+                      if candidate.is_dir():
+                          continue
+                      raise SystemExit(f"published splicing tree contains a non-regular file: {candidate}")
+                  digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+                  entries.append((candidate.relative_to(root).as_posix(), digest))
+              return entries
+
+          if digest_tree(pathlib.Path(sys.argv[1])) != digest_tree(pathlib.Path(sys.argv[2])):
+              raise SystemExit("existing splicing publication differs from the staged retry payload")
+          PY
+          else
+            mkdir -p "$(dirname "$final_splicing_directory")"
+            if [ "$(stat -c '%d' "$staging_splicing_directory")" != "$(stat -c '%d' "$(dirname "$final_splicing_directory")")" ]; then
+              printf 'Publication staging and results must share a filesystem for atomic directory publication.\n' >&2
+              exit 1
+            fi
+            mv "$staging_splicing_directory" "$final_splicing_directory"
+          fi
+
+          "$otter_cli" artifact publish '${{ paths.config }}' "$declaration_path"
+          test -f "$manifest_path"
+          test "$(stat -c '%a' "$manifest_path")" = 444
+          "$otter_cli" artifact verify '${{ paths.config }}'

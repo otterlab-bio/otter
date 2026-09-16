@@ -1,0 +1,150 @@
+name: Go CI/CD
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT }}
+
+      - name: Install samtools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y samtools
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Verify toolchain consistency
+        run: bash scripts/verify_toolchain_consistency.sh
+
+      - name: Verify the job-summary helper copies are in sync
+        run: bash scripts/ci/check-job-summary-sync.sh
+
+      - name: Run tests
+        run: |
+          go mod download
+          go test -v ./...
+          go vet ./...
+          go build -o /tmp/otter .
+
+      - name: Run submodule tests (bamdriver)
+        run: |
+          cd bamdriver
+          go test -v ./...
+
+      - name: Run submodule tests (pairbam)
+        run: |
+          cd pairbam
+          go test -v ./...
+
+      - name: Run submodule tests (xenofilx)
+        run: |
+          cd xenofilx
+          go test -count=1 ./...
+          go vet ./...
+          # Keep the race gate aligned with xenofilx CI: real-BAM/BGZF tests
+          # are covered by the normal suite and exceed runner budgets under race.
+          go test -race -count=1 -short ./...
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+      - name: Job summary
+        if: always()
+        continue-on-error: true
+        run: |
+          bash scripts/ci/job-summary.sh \
+            --verdict "${{ job.status }}" \
+            --title "OTTER — Go CI/CD test" \
+            --checked "Runs the umbrella Go test suite, vet and build, then the bamdriver, pairbam and xenofilx submodule suites including the xenofilx race gate and govulncheck. Verifies the pinned toolchain contract first." \
+            --check "Toolchain consistency|verify_toolchain_consistency.sh passes|see step log|-" \
+            --check "Umbrella Go tests, vet, build|all pass|see step log|-" \
+            --check "bamdriver submodule tests|pass|see step log|-" \
+            --check "pairbam submodule tests|pass|see step log|-" \
+            --check "xenofilx tests, race gate, govulncheck|pass|see step log|-" \
+            --metric "Go toolchain|1.24 (pinned by setup-go)" \
+            --limit "Unit and integration tests over the checked-out tree, including submodules at this commit. This is the compile-and-test gate, not the real-BAM Gate A-D evidence." \
+            --note "Submodules are resolved with the SUBMODULES_PAT token so private repositories are readable."
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    # 仅构建 Linux amd64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_PAT }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: 0
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          DATE: ${{ github.event.head_commit.timestamp }}
+        run: |
+          VERSION=${VERSION#refs/tags/}
+          LDFLAGS="-s -w -X github.com/otterlab-bio/otter/cmd.buildVersion=${VERSION#v} -X github.com/otterlab-bio/otter/cmd.buildCommit=${COMMIT:0:7} -X github.com/otterlab-bio/otter/cmd.buildDate=${DATE}"
+
+          # 静态链接构建（适用于CentOS等低版本GLIBC环境）
+          go build -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o otter-linux-amd64-static .
+
+          # 动态链接构建（常规Linux）
+          go build -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o otter-linux-amd64 .
+
+          # 重命名产物
+          mv otter-linux-amd64 otter-${VERSION#v}-linux-amd64
+          mv otter-linux-amd64-static otter-${VERSION#v}-linux-amd64-static
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: otter-*
+          retention-days: 7
+
+      - name: Job summary
+        if: always()
+        continue-on-error: true
+        run: |
+          ls -l otter-* 2>/dev/null || true
+          bash scripts/ci/job-summary.sh \
+            --verdict "${{ job.status }}" \
+            --title "OTTER — Go CI/CD build" \
+            --checked "Builds the Linux amd64 OTTER binary in both link modes and uploads them as the linux-amd64 artifact." \
+            --check "Static build (low-glibc targets)|otter-\${{ github.ref_name }}-linux-amd64-static produced|see artifact|-" \
+            --check "Dynamic build (regular Linux)|otter-\${{ github.ref_name }}-linux-amd64 produced|see artifact|-" \
+            --metric "Target|linux/amd64 only" \
+            --metric "Link modes|static and dynamic" \
+            --artifact "linux-amd64" \
+            --limit "Compiled binaries only. Static-linkage verification of release artifacts is asserted by the Release Binaries workflow, not here."

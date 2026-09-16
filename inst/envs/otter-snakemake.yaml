@@ -1,0 +1,24 @@
+name: otter-snakemake
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # Python and Core
+  - python=3.11.9
+  - numpy=1.24.4
+  - snakemake=9.4.1
+  - pyyaml
+  - pandas
+  - matplotlib
+
+  # Workflow Dependencies
+  - networkx
+  - graphviz
+  - jinja2
+  - click
+  - requests
+  - packaging
+
+  # Version Control
+  - git
+  - gitpython

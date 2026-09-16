@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://otter.dev/schema/otter-filtered-bam-validation-v1.schema.json",
+  "title": "Otter Filtered BAM Validation Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "workflow",
+    "phase",
+    "graft_species",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "otter.filtered-bam-validation/v1"
+    },
+    "status": {
+      "const": "validated"
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "minLength": 1
+    },
+    "graft_species": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/filtered_bam"
+      }
+    }
+  },
+  "$defs": {
+    "filtered_bam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "bam_path",
+        "bam_size_bytes",
+        "bam_sha256",
+        "bai_path",
+        "bai_size_bytes",
+        "bai_sha256",
+        "mapped_read_count"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bam_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bam_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bam_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bai_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bai_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bai_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mapped_read_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

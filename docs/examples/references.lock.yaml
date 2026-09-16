@@ -1,0 +1,7 @@
+schema_version: otter.references.lock/v1
+
+references:
+  primary:
+    id: hg38
+    release: GRCh38.p14
+    manifest_digest: sha256:5555555555555555555555555555555555555555555555555555555555555555

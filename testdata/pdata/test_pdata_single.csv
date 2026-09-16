@@ -1,0 +1,4 @@
+sampleid,inline_barcode_sequence,condition
+sample1,ATCG,control
+sample2,,control
+sample3,GCTA,control

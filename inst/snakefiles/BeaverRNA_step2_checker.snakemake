@@ -1,0 +1,27 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_{species}.bam"), sample=SIDs,species = species) ,
+    expand(os.path.join(config["directories"]["qualimap"],"{sample}_{species}","qualimapReport.html") , sample=SIDs,species = species) ,
+    expand(os.path.join(config["directories"]["methylation_call"], "{sample}_{species}"+".txt"), sample=SIDs,species = species),
+    os.path.join(config["directories"]["beta_matrix"], "matrix_count.txt"),
+    os.path.join(config["directories"]["beta_matrix"], "matrix_norm.txt"),
+    os.path.join(config["directories"]["qc_summary"],"qc_summary.xlsx"),
+    os.path.join(config["directories"]["bsmap"]["main"], "RNASplicing", "splicing-outcome.json")
+
+# construct matrix
+
+include:"rules/rnaseq_matrix.smk"
+
+# qc summary
+
+include:"rules/rna_qc_summary.smk"
+
+# RNA Splicing
+
+include:"rules/rnaseq_splicing.smk"
+

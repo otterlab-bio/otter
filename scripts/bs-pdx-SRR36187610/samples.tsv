@@ -1,0 +1,2 @@
+sample_id	r1	r2	group	batch	adapter_r1	adapter_r2
+SRR36187610	data/SRR36187610_R1.fastq.gz	data/SRR36187610_R2.fastq.gz	bs-pdx	comparison-20260815	AUTO	AUTO

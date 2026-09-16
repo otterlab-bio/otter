@@ -1,0 +1,55 @@
+schema_version: otter.project/v1
+project:
+  id: bs-pdx-SRR36187610
+  description: BS-PDX toolchain comparison SRR36187610
+workflow:
+  scenario: bs-pdx
+  toolchain: modern
+  legacy_extensions: []
+execution:
+  executor: craftmake
+  backend: slurm
+  site: paracloud-gate6
+samples:
+  manifest: samples.tsv
+references:
+  species:
+    - role: graft
+      selection: hg38@GRCh38-gencode-v44
+    - role: host
+      selection: mm10@GRCm38-gencode-M25
+resources:
+  defaults:
+    cores: 6
+    memory: 8GiB
+    time: 02:00:00
+    partition: amd_512
+  phases:
+    step1:
+      cores: 6
+      memory: 8GiB
+      time: '12:00:00'
+      partition: amd_512
+    step2:
+      cores: 80
+      memory: 320GiB
+      time: 12:00:00
+      partition: amd_512
+    step2-check:
+      cores: 4
+      memory: 128GiB
+      time: 12:00:00
+      partition: amd_512
+    step3:
+      cores: 20
+      memory: 64GiB
+      time: 08:00:00
+      partition: amd_512
+    step3-check:
+      cores: 10
+      memory: 34GiB
+      time: 08:00:00
+      partition: amd_512
+observability:
+  metrics: true
+  retain_logs: true

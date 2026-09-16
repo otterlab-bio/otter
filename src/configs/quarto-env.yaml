@@ -1,0 +1,6 @@
+name: quarto-env
+channels:
+  - conda-forge
+dependencies:
+  - quarto
+  - pandoc

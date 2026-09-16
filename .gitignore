@@ -1,0 +1,144 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+config.yaml
+*.log
+results/
+data/fastq/*.fastq.gz
+data/pdata/*.xlsx
+
+# Temporary files
+tmp/
+temp/
+
+# Bioinformatics workflow outputs
+userspace/
+workflow/
+!internal/workflow/
+!internal/workflow/**
+analysis/
+saveRDS/
+www/
+
+# Snakemake outputs
+*.snakemake
+!inst/snakefiles/*.snakemake
+!testdata/e2e/test_init/*.snakemake
+.snakemake/
+
+# Large local replay fixtures (not committed)
+testdata/gate6/xenofilx-local-replay-20260810/
+
+# Conda environments
+/envs/
+!inst/envs/
+!inst/envs/*.yaml
+*.yml.lock
+*.conda
+
+# Genome indices (large files)
+*.bt2
+*.fa.fai
+*.star/
+*.bismark/
+
+# Log files
+*.log
+*.out
+*.err
+
+# Workflow intermediate files
+*.bam
+*.bai
+*.sam
+*.fastq
+*.fq
+*.bed
+*.bigWig
+
+# R/Python cache
+.Rhistory
+.RData
+.Ruserdata
+__pycache__/
+*.pyc
+*.pyo
+.pip-cache/
+
+# Test artifacts
+coverage.out
+test_results/
+*.test
+
+# Local Gate 6 scratch notebooks
+/scripts/test.ipynb
+
+# Build artifacts
+dist/
+build/
+
+# Go installer build output
+installer/otter-install
+
+# Logo design scratch directory
+otter-logo/
+
+# Bioinformatics data files (examples)
+examples/data/
+examples/output/
+# Build outputs
+target/
+*.exe
+otter
+!skills/
+!skills/otter/
+!skills/otter/**
+
+# Test outputs
+test_slurm/
+matsrun.lock
+
+# Craftmake downsample fixtures (committed reference fixtures).
+# Keep at the end so these negations win over the generic *.bam/*.bai/*.fastq rules above.
+# The FASTQ fixtures are committed because the offline rehearsal reads them by default. The
+# BAM fixtures are deliberately not committed: nothing in this repository consumes them, and
+# they are reproducible build output of scripts/craftmake-downsample-fixtures.sh.
+!testdata/gate6/craftmake-downsample-20260906/
+!testdata/gate6/craftmake-downsample-20260906/**
+!testdata/gate6/craftmake-downsample-20260906/**/*.fastq.gz
+!testdata/gate6/craftmake-downsample-20260906/**/*.json
+testdata/gate6/craftmake-downsample-20260906/bam/
+

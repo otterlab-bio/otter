@@ -1,0 +1,134 @@
+# otter Analysis Project Configuration
+# Generated automatically by: otter create
+#
+# This file uses nested structure for rootless_rules compatibility.
+# Edit this file to customize your analysis parameters.
+# Then run: otter run --config <this-file>
+#
+
+SIDs:
+    - sample2
+    - sample1
+directories:
+    beta_matrix: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\analysis\betaM
+    bsmap:
+        filtered: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\bsmap\Filtered_bams
+        main: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\bsmap
+        temp: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\bsmap\tmp
+    clubcpg:
+        coverage: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\clubcpg\clubcpg_coverage_before
+        impute: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\clubcpg\clubcpg_coverage_impute
+        main: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\clubcpg
+        model: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\clubcpg\clubcpg_model
+    config: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\config
+    gc_bias: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\QC\GCbias
+    methrix_h5: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\mCall\methrixh5
+    methylation_call: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\mCall
+    mhap: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\mhap
+    qc:
+        after: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\fastqc_clean
+        before: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\fastqc_raw
+        main: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\QC
+    qc_summary: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\QC
+    qualimap: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\QC\qualimap
+    sid_log: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\log
+    uxm_summary: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\analysis\uxm
+    work: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c
+error: 0.2
+input:
+    fastq_dir: test_fastq
+    pdata_file: ""
+    suffix: _R1.fastq.gz
+    suffix2: _R2.fastq.gz
+jobid: fb9c9897e4b882e03d8637e14e177af4488edc5c
+metadata:
+    group_levels: 0
+    pdx_pipeline: "no"
+    sample_ids:
+        - sample2
+        - sample1
+    user_email: ""
+mode: RRBS
+output:
+    analysis_dir: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\analysis
+    base_dir: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c
+    log_dir: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\log
+    raw_dir: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\data
+    trim_dir: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow\trim
+    workflow_dir: test_project_nested\fb9c9897e4b882e03d8637e14e177af4488edc5c\workflow
+parallel:
+    dwarf_workers: 1
+    workers: 4
+reference:
+    annotations:
+        names:
+            - human
+    files:
+        cgi: inst/human/human_cpgIsland.bed
+        cpg_sites: inst/human/human_CpG_sites.gz
+        fasta:
+            - inst/pdx/homo_sapiens/human.fasta
+        genome:
+            - inst/pdx/homo_sapiens/
+    genome: human
+    indices:
+        genome:
+            - inst/pdx/homo_sapiens/
+    rnaseq:
+        chrs:
+            - chr1
+            - chr2
+            - chr3
+            - chr4
+            - chr5
+            - chr6
+            - chr7
+            - chr8
+            - chr9
+            - chr10
+            - chr11
+            - chr12
+            - chr13
+            - chr14
+            - chr15
+            - chr16
+            - chr17
+            - chr18
+            - chr19
+            - chr20
+            - chr21
+            - chr22
+            - chrX
+            - chrY
+            - chrM
+        gtf: ""
+        ref: ""
+species: human
+workers: 4
+workflow:
+    adapters:
+        error: 0.2
+        seq1:
+            - NO_ADAPTER_CAL_USE_DEFAULT
+            - NO_ADAPTER_CAL_USE_DEFAULT
+        seq2:
+            - NO_ADAPTER_CAL_USE_DEFAULT
+            - NO_ADAPTER_CAL_USE_DEFAULT
+    alignment:
+        C1: "7"
+        C2: "9"
+        T1: 0
+        T2: 0
+    jobid: fb9c9897e4b882e03d8637e14e177af4488edc5c
+    mode: RRBS
+    species:
+        graft: human
+        host: ""
+        name: human
+    trim:
+        fixed: ""
+        read1_3: 0
+        read1_5: 0
+        read2_3: 0
+        read2_5: 0
+        seq_deth: 10

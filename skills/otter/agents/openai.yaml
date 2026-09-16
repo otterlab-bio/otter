@@ -1,0 +1,7 @@
+interface:
+  display_name: "otter Workspace"
+  short_description: "Work on otter and its matched subrepos"
+  default_prompt: "Use $otter to work in the otter repo or one of its matching submodules with the right toolchain and validation flow."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,10 @@
+schema_version: otter.references.lock/v1
+references:
+  graft:
+    id: hg38
+    release: GRCh38-gencode-v44
+    manifest_digest: sha256:bda77ed9591ec4b9b6c4fadf032e9bfeafec0a6e03e7854e4d706e4f8909a132
+  host:
+    id: mm10
+    release: GRCm38-gencode-M25
+    manifest_digest: sha256:777158ba49da3f43c76b449c635878ba65d26dfc2ebd44cd2af212a3aabf29e2

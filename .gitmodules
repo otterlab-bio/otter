@@ -1,0 +1,30 @@
+[submodule "enva"]
+	path = enva
+	url = https://github.com/otterlab-bio/enva.git
+[submodule "xenofilx"]
+	path = xenofilx
+	url = https://github.com/otterlab-bio/xenofilx.git
+[submodule "pairbam"]
+	path = pairbam
+	url = https://github.com/otterlab-bio/pairbam.git
+[submodule "seq2mat"]
+	path = seq2mat
+	url = https://github.com/otterlab-bio/seq2mat.git
+[submodule "methx"]
+	path = methx
+	url = https://github.com/otterlab-bio/methx.git
+[submodule "qctb"]
+	path = qctb
+	url = https://github.com/otterlab-bio/qctb.git
+[submodule "fastqcx"]
+	path = fastqcx
+	url = https://github.com/otterlab-bio/fastqcx.git
+[submodule "matsrun"]
+	path = matsrun
+	url = https://github.com/otterlab-bio/matsrun.git
+[submodule "bamdriver"]
+	path = bamdriver
+	url = https://github.com/otterlab-bio/bamdriver.git
+[submodule "craftmake"]
+	path = craftmake
+	url = https://github.com/otterlab-bio/craftmake.git

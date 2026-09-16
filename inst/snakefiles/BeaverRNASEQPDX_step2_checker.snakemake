@@ -1,0 +1,13 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_{species}.bam"), sample=SIDs,species = species),
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "Filtered_bams", "{sample}_fixed_" + config["workflow"]["species"]["graft"] + "_Filtered.bam"), sample=SIDs),
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "Filtered_bams", "{sample}_fixed_" + config["workflow"]["species"]["graft"] + "_Filtered.bam.bai"), sample=SIDs)
+
+include: "rules/XenofilteR.smk"
+

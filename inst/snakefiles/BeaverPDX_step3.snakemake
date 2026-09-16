@@ -1,0 +1,13 @@
+#configfile: "config/config.yaml"
+
+SIDs = config["SIDs"]
+species = config["species"]
+# 运行所有流程时，rule all 需要加入所有的output汇总
+rule all:
+  input:
+    expand(os.path.join(config["outDir_mCall"], "{sample}_nsort.bismark.cov.gz"),sample = SIDs),
+    expand(os.path.join(config["directories"]["bsmap"]["main"], "{sample}_nsort.bam"),sample =SIDs )
+
+# build beta
+
+include:"rules/pdx_build_methy_matrix_bismark.smk"
