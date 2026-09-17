@@ -27,15 +27,22 @@ type V1AssetSet struct {
 // project. "workflows" and "rules" come from the Snakemake compatibility assets
 // because the Craftmake catalog is resolved from the installed catalog or an
 // explicit --catalog path rather than being copied into the project.
+//
+// The rules live under workflows/ rather than at the project root because a
+// Snakefile's include: directives resolve against the Snakefile's own directory,
+// not the working directory. With both sets pinned together, the compatibility
+// executor finds its includes without any asset being written to the project
+// root, and the working directory is free to stay at the project root so that
+// relative output paths behave as before.
 var V1AssetSets = []V1AssetSet{
 	{Role: "workflows", Source: "inst/snakefiles"},
-	{Role: "rules", Source: "inst/rules"},
+	{Role: filepath.Join("workflows", "rules"), Source: "inst/rules"},
 	{Role: "environments", Source: "inst/envs"},
 	{Role: "schemas", Source: "docs/schema"},
 }
 
 // V1ProjectDirs are the project-level directories a canonical project owns.
-var V1ProjectDirs = []string{"workflows", "rules", "environments", "schemas", "runs"}
+var V1ProjectDirs = []string{"workflows", "environments", "schemas", "runs"}
 
 // CopiedAssetSet reports what was pinned for one role.
 type CopiedAssetSet struct {

@@ -113,10 +113,17 @@ func writeCanonicalProjectFixture(t *testing.T, fastqNames []string) (projectRoo
 // unit test.
 func writeCommandAssetFixture(t *testing.T, projectRoot string) {
 	t.Helper()
-	for _, directory := range []string{"workflows", "rules", "environments", "schemas", "runs"} {
+	for _, directory := range []string{"workflows", "environments", "schemas", "runs"} {
 		if err := os.MkdirAll(filepath.Join(projectRoot, directory), 0o755); err != nil {
 			t.Fatal(err)
 		}
+	}
+	// The rules are pinned under workflows/ alongside the Snakefiles, so a
+	// Snakefile's own include: directives resolve without the project root
+	// holding any asset. The resolver digests this path, so the fixture must
+	// create it.
+	if err := os.MkdirAll(filepath.Join(projectRoot, "workflows", "rules"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	writeTestFile(t, filepath.Join(projectRoot, "workflows", "rrbs.yaml"), "name: rrbs\n")
 }
@@ -537,7 +544,7 @@ func TestInitCanonicalTrackWritesProjectLock(t *testing.T) {
 		t.Fatalf("canonical init failed (exit %d):\n%s\n%s", output.exitCode, output.stdout, output.stderr)
 	}
 
-	for _, expectedDirectory := range []string{"workflows", "rules", "environments", "schemas", "runs"} {
+	for _, expectedDirectory := range []string{"workflows", "environments", "schemas", "runs"} {
 		info, err := os.Stat(filepath.Join(projectRoot, expectedDirectory))
 		if err != nil {
 			t.Errorf("init did not create %s/: %v", expectedDirectory, err)

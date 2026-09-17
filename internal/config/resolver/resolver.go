@@ -154,7 +154,7 @@ func (Resolver) Resolve(options Options) (configv1.RunSnapshot, error) {
 	}
 	workflowAssets := []string{
 		filepath.Join(projectRoot, "workflows"),
-		filepath.Join(projectRoot, "rules"),
+		filepath.Join(projectRoot, "workflows", "rules"),
 		filepath.Join(projectRoot, "environments"),
 		filepath.Join(projectRoot, "schemas"),
 		filepath.Join(projectRoot, "project.lock.yaml"),

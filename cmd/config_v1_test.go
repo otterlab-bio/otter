@@ -122,10 +122,13 @@ observability:
 	writeTestFile(t, filepath.Join(projectRoot, "samples.tsv"), "sample_id\tr1\tr2\nS01\tdata/S01_R1.fastq.gz\tdata/S01_R2.fastq.gz\n")
 	writeTestFile(t, filepath.Join(projectRoot, "data", "S01_R1.fastq.gz"), "@S01/1\nACGT\n+\nIIII\n")
 	writeTestFile(t, filepath.Join(projectRoot, "data", "S01_R2.fastq.gz"), "@S01/2\nTGCA\n+\nIIII\n")
-	for _, directoryName := range []string{"workflows", "rules", "environments", "schemas"} {
+	for _, directoryName := range []string{"workflows", "environments", "schemas"} {
 		if err := os.MkdirAll(filepath.Join(projectRoot, directoryName), 0o755); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.MkdirAll(filepath.Join(projectRoot, "workflows", "rules"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	writeTestFile(t, filepath.Join(projectRoot, "workflows", "rrbs.yaml"), "name: rrbs\n")
 	writeTestFile(t, filepath.Join(projectRoot, "project.lock.yaml"), "schema_version: otter.project.lock/v1\n")

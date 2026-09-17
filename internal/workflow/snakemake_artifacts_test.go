@@ -892,7 +892,7 @@ func writeSnakemakePublicationSnapshot(t *testing.T, scenario configv1.Scenario)
 		workRoot,
 		resultsRoot,
 		filepath.Join(projectRoot, "workflows"),
-		filepath.Join(projectRoot, "rules"),
+		filepath.Join(projectRoot, "workflows", "rules"),
 		filepath.Join(projectRoot, "environments"),
 		filepath.Join(projectRoot, "schemas"),
 	} {
@@ -910,7 +910,7 @@ func writeSnakemakePublicationSnapshot(t *testing.T, scenario configv1.Scenario)
 	writeWorkflowArtifact(t, projectLockPath, "workflow assets\n")
 	workflowAssets := []string{
 		filepath.Join(projectRoot, "workflows"),
-		filepath.Join(projectRoot, "rules"),
+		filepath.Join(projectRoot, "workflows", "rules"),
 		filepath.Join(projectRoot, "environments"),
 		filepath.Join(projectRoot, "schemas"),
 		projectLockPath,

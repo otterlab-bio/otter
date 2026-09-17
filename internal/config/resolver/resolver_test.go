@@ -326,10 +326,15 @@ func writeProjectFixture(t *testing.T, projectRoot string) {
 	writeFile(t, filepath.Join(projectRoot, "data", "S01_R2.fastq.gz"), "@S01/2\nTGCA\n+\nIIII\n")
 	lock := "schema_version: otter.references.lock/v1\nreferences:\n  primary:\n    id: hg38\n    release: GRCh38.p14\n    manifest_digest: " + fixtureDigest + "\n"
 	writeFile(t, filepath.Join(projectRoot, "references.lock.yaml"), lock)
-	for _, directoryName := range []string{"workflows", "rules", "environments", "schemas"} {
+	for _, directoryName := range []string{"workflows", "environments", "schemas"} {
 		if err := os.MkdirAll(filepath.Join(projectRoot, directoryName), 0o755); err != nil {
 			t.Fatal(err)
 		}
+	}
+	// The rules are pinned under workflows/ so a Snakefile finds its own includes
+	// without the project root holding any asset.
+	if err := os.MkdirAll(filepath.Join(projectRoot, "workflows", "rules"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	writeFile(t, filepath.Join(projectRoot, "workflows", "rrbs.yaml"), "name: rrbs\n")
 	writeFile(t, filepath.Join(projectRoot, "project.lock.yaml"), "schema_version: otter.project.lock/v1\n")

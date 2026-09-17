@@ -176,7 +176,13 @@ func (e *SnakemakeExecutor) GetSnakefilePath() string {
 }
 
 // resolveSnakefilePath finds the snakemake file by checking multiple locations
-// It checks: 1) current directory, 2) otter-project/ subdirectory
+// It checks: 1) current directory, 2) workflows/, 3) otter-project/ subdirectory
+//
+// The workflows/ entries matter for canonical projects. Those pin the Snakefiles
+// under workflows/ rather than at the project root, and a Snakefile locates its
+// own include: directives relative to its own directory, so the file is found
+// without anything being written to the project root. The otter-project/ and
+// root entries remain for the legacy compatibility layout.
 func (e *SnakemakeExecutor) resolveSnakefilePath(snakefile string) string {
 	// If it's an absolute path, return as-is
 	if filepath.IsAbs(snakefile) {
@@ -189,6 +195,13 @@ func (e *SnakemakeExecutor) resolveSnakefilePath(snakefile string) string {
 		return snakefile
 	}
 
+	// Check the canonical pinned asset directory
+	canonicalPath := filepath.Join("workflows", snakefile)
+	if _, err := os.Stat(canonicalPath); err == nil {
+		logger.Debugf("Found snakemake file in workflows/: %s", canonicalPath)
+		return canonicalPath
+	}
+
 	// Check otter-project subdirectory
 	projectPath := filepath.Join("otter-project", snakefile)
 	if _, err := os.Stat(projectPath); err == nil {
@@ -197,6 +210,6 @@ func (e *SnakemakeExecutor) resolveSnakefilePath(snakefile string) string {
 	}
 
 	// Fallback to original path (will cause error if not found)
-	logger.Warnf("Snakemake file not found in current directory or otter-project/, using: %s", snakefile)
+	logger.Warnf("Snakemake file not found in the current directory, workflows/, or otter-project/, using: %s", snakefile)
 	return snakefile
 }
