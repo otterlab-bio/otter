@@ -41,13 +41,17 @@ The manual is the task-oriented sequence. Read it in order for a first run, or j
 
 ## Interactive walkthroughs
 
-- [OTTER on Google Colab](../notebooks/otter-colab-walkthrough.ipynb) — installs the published release with the real `otter-install`, writes a simulated reference registry, authors every scenario from the repository's own fixtures, and resolves each run with `--dry-run`. Offline after the install, and it executes no tool.
+- [OTTER on Google Colab](../notebooks/otter-colab-walkthrough.ipynb) — installs the published release with the real `otter-install`, writes a simulated reference registry, authors every scenario from the repository's own fixtures, and resolves every phase of each run with `--dry-run`. Offline after the install, and it executes no tool.
+- [OTTER on Google Colab (简体中文)](../notebooks/otter-colab-walkthrough-zh.ipynb) — the same walkthrough with Chinese prose. Identical cells and identical execution.
 
-  Open it directly in Colab:
+  Open either directly in Colab:
 
   ```text
   https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb
+  https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough-zh.ipynb
   ```
+
+  Both explain why the reference genome is simulated rather than downloaded (a real release is tens of gigabytes against roughly 100 GB of ephemeral Colab disk) and how to fetch a real one on your own hardware.
 
 ## Contracts outside this directory
 

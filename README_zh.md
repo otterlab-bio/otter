@@ -83,17 +83,27 @@ go build -o otter .
 
 ### 或者直接在 Colab 里试用
 
-无需本地安装：这个 notebook 用真实的 `otter-install` 安装已发布的 release，写入一个模拟的参考基因组注册表，用仓库自带的降采样 FASTQ fixture 为每个场景执行 `otter build`，并用 `--dry-run` 解析每个 run，让你看到任务图编译的结果。它不执行任何工具，也不产生任何科学结果。
+无需本地安装：这个 notebook 用真实的 `otter-install` 安装已发布的 release，写入一个模拟的参考基因组注册表，用仓库自带的降采样 FASTQ fixture 为每个场景执行 `otter build`，并对每个 workflow 的每个 phase 用 `--dry-run` 解析 run，让你看到任务图编译的结果。它不执行任何工具，也不产生任何科学结果。
+
+中文版：
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough-zh.ipynb)
+
+```text
+https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough-zh.ipynb
+```
+
+英文版：
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb)
-
-如果只想复制链接直接打开：
 
 ```text
 https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb
 ```
 
-notebook 位于 [`notebooks/otter-colab-walkthrough.ipynb`](notebooks/otter-colab-walkthrough.ipynb)。全程约十五分钟，其中大部分时间用于 `enva` 创建 `otter-core` 和 `otter-snakemake`；把 `SKIP_ENVS` 设为 `True` 可以跳过环境创建，只跑 authoring 和 planning。
+两个 notebook 位于 [`notebooks/`](notebooks/)，内容与执行逻辑完全一致，只有说明文字的语言不同。全程约十五分钟，其中大部分时间用于 `enva` 创建 `otter-core` 和 `otter-snakemake`；把 `SKIP_ENVS` 设为 `True` 可以跳过环境创建，只跑 authoring 和 planning。
+
+关于为什么 notebook 里是「模拟」参考基因组而不是直接下载：一个真实 release 是数十 GB 级别（单是 GRCh38 的 STAR 索引就约 30 GB），而免费 Colab 运行时只有约 100 GB 临时磁盘。notebook 内说明了在自己的环境里如何用 `otter-install -reference-fetch`、`otter reference build` 或直接下载来获取真实参考基因组。
 
 ### 创建并运行兼容路径项目
 

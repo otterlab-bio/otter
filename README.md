@@ -119,8 +119,9 @@ go build -o otter .
 
 No local setup, no download of your own: this notebook installs the published release with the
 real `otter-install`, builds a simulated reference registry, authors every scenario from the
-repository's own downsampled FASTQ fixtures, and resolves each run with `--dry-run` so you can
-watch the task graph compile. It executes no tool and produces no scientific result.
+repository's own downsampled FASTQ fixtures, and resolves every phase of each run with
+`--dry-run` so you can watch the task graph compile. It executes no tool and produces no
+scientific result.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb)
 
@@ -130,10 +131,18 @@ Or copy the link directly:
 https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb
 ```
 
-The notebook lives at [`notebooks/otter-colab-walkthrough.ipynb`](notebooks/otter-colab-walkthrough.ipynb).
-It takes about fifteen minutes, most of which is `enva` creating `otter-core` and
+A [Chinese-language version](notebooks/otter-colab-walkthrough-zh.ipynb) covers the same ground
+with identical cells, so either can be read alongside the other.
+
+The notebooks live in [`notebooks/`](notebooks/).
+They take about fifteen minutes, most of which is `enva` creating `otter-core` and
 `otter-snakemake`; set `SKIP_ENVS = True` for a faster pass that exercises authoring and planning
 only.
+
+The registry is simulated because a real release is tens of gigabytes — a GRCh38 STAR index alone
+is roughly 30 GB — against about 100 GB of ephemeral Colab disk. Both notebooks show how to fetch
+a real reference on your own hardware with `otter-install -reference-fetch`, `otter reference
+build`, or a direct download.
 
 ### Create and run a project
 
