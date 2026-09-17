@@ -7,9 +7,31 @@
 Read these areas first when the task targets the root repo:
 
 - `main.go`, `cmd/`, `internal/`, `pkg/` for Go CLI behavior
-- `inst/` for embedded Snakemake rules, env YAMLs, and helper R scripts
-- `scripts/` for install, setup, build, and release flows
+- `inst/` for embedded workflow assets: Snakefiles, Snakemake rules, env YAMLs, and helper R scripts
+- `installer/` for the static release installer — a **separate Go module**, so root `go test ./...` and `go vet ./...` do not cover it
+- `scripts/` for install, setup, build, release, and the offline `e2e/` rehearsal
 - `testdata/` for fixtures
+- `docs/` for the user manual, worked examples, and schemas; `skills/otter/` for agent operating rules
+
+### Embedded assets and where they land
+
+`inst/` is the source of truth; a canonical project receives copies of it. Changing
+a directory name in `internal/assets/v1layout.go` changes the project layout, so the
+resolver digest list in `internal/config/resolver/resolver.go` must be updated in the
+same change or run resolution breaks.
+
+| Source in `inst/` | Pinned role in a canonical project |
+| --- | --- |
+| `inst/snakefiles/` | `workflows/` |
+| `inst/rules/` | `workflows/rules/` |
+| `inst/envs/` | `environments/` |
+| `docs/schema/` | `schemas/` |
+
+The rules sit under `workflows/` rather than at the project root because a
+Snakefile's `include:` directives resolve relative to the Snakefile's own
+directory. The legacy track still writes its Snakefiles to the project root, which
+is why the executor's `resolveSnakefilePath` checks the working directory before
+`workflows/`.
 
 ## Direct submodules
 

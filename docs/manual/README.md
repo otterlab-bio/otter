@@ -50,28 +50,58 @@ references into `references.lock.yaml`, and `config resolve` writes the immutabl
 `run.yaml` that `otter run` consumes. A reference selection is always
 `<id>@<release>`, for example `hg19@GRCh37.p13-gencode-v19`.
 
+`otter build` chains init, create, validate, and resolve into one command and
+stops before execution:
+
+```bash
+otter build \
+  --project-root my_project \
+  --fastq ./fastq \
+  --pdata ./samples.csv \
+  --mode RRBS \
+  --reference-root /shared/references \
+  --reference-primary hg19@GRCh37.p13-gencode-v19 \
+  --backend local
+```
+
+It defaults to the `craftmake` executor; `--executor snakemake` records the
+Snakemake compatibility executor in the snapshot instead.
+
 The legacy compatibility track requires `--legacy` on **both** authoring commands:
 
 ```bash
 otter init my_project --legacy
 otter create --legacy --fastq ./fastq --pdata ./samples.csv \
   --mode RRBS --output my_project/userspace --jobid demo_rrbs
-otter run --config my_project/userspace/demo_rrbs/config/otter.yaml \
-  --executor snakemake \
-  --engine local --foreground
 ```
 
-Legacy `otter.yaml` is an authoring format that no executor accepts directly;
-migrate and resolve it first (see [chapter 8](08-reference-migration.md)).
+Legacy `otter.yaml` is an authoring format that no executor accepts directly, so
+this track is authoring-only as written. To run it, migrate into a canonical root
+and execute the resulting snapshot:
+
+```bash
+otter init migrated
+otter config migrate \
+  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --output migrated/project.yaml \
+  --reference-root "$OTTER_REFERENCE_ROOT" \
+  --reference-primary hg19@GRCh37.p13-gencode-v19
+otter config resolve --project migrated/project.yaml \
+  --reference-root "$OTTER_REFERENCE_ROOT" --backend local
+otter run --config migrated/runs/<run-id>/run.yaml \
+  --executor snakemake --dry-run --foreground
+```
+
+See [chapter 8](08-reference-migration.md) for the migration contract.
 
 ## Before you begin
 
 - Linux or macOS for local development; Linux with SLURM is the primary production target.
 - Paired FASTQ files and a matching pdata file for `create`.
 - A reference registry release for the selected scenario, addressed as
-  `<id>@<release>` (see `reference registry`).
+  `<id>@<release>` (see [reference migration](08-reference-migration.md)).
 - A site profile when the machine is not the default target; generate one with
-  `otter site generate` (see `site profiles`).
+  `otter site generate` (see [advanced usage](05-advanced-usage.md)).
 - `otter-snakemake` for the Snakemake compatibility path.
 - `enva` and the managed runtime environments when using the release workflow setup.
 

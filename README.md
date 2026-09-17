@@ -35,7 +35,7 @@ rehearsal runs offline.
 
 ```text
 $ bash scripts/e2e/otter_e2e.sh --otter ./otter --craftmake ./craftmake
-  stages passed: 64
+  stages passed: 101
   stages failed: 0
 ```
 
@@ -66,7 +66,7 @@ recorded with its compute-node verification in the Gate 6 operations record.
 
 - Start a workflow project with `init` and generate a validated analysis configuration with `create`.
 - Run RRBS, WGBS, RNA-seq, BS-PDX, and RNA-PDX workflows.
-- Use local execution or SLURM, including per-step CPU, memory, and partition controls on the current Snakemake path.
+- Use local execution or SLURM. The backend and the per-phase CPU, memory, and partition envelope are fixed when a run is resolved, and the snapshot is authoritative at run time.
 - Track background runs with `task list`, `task status`, `task logs`, `task stop`, and `task report`.
 - Resolve canonical project files into immutable `otter.run/v1` snapshots with reference and resource identity.
 - Validate published artifact manifests and checksums at the run boundary.
@@ -143,6 +143,26 @@ otter run \
   --foreground
 ```
 
+The snapshot records every path absolutely, so `otter run` does not need to be
+started from the project directory — pass an absolute `--config` and it works
+from anywhere. The one exception is `--run-id`, which resolves under the working
+directory; pair it with `--project-dir` or `cd` in first.
+
+`otter build` chains init, create, validate, and resolve into one step and stops
+before execution. It defaults to the craftmake executor; `--executor snakemake`
+records the Snakemake compatibility executor in the snapshot instead.
+
+```bash
+otter build \
+  --project-root my_project \
+  --fastq /data/fastq \
+  --mode RRBS \
+  --pdata /data/samples.csv \
+  --reference-root /shared/otter/references \
+  --reference-primary hg19@GRCh37.p13-gencode-v19 \
+  --backend local
+```
+
 A reference is always selected as `<id>@<release>`. `create` verifies that selection against the
 registry and writes the resolved identity to `references.lock.yaml`; `config resolve` then writes
 the immutable `otter.run/v1` snapshot that `craftmake` executes.
@@ -176,16 +196,30 @@ otter create \
   --pdata /data/samples.xlsx \
   --output my_project/userspace \
   --jobid demo_rrbs
-
-otter run \
-  --config my_project/userspace/demo_rrbs/config/otter.yaml \
-  --executor snakemake \
-  --engine local \
-  --foreground
 ```
 
-Legacy `otter.yaml` is an authoring format that neither executor accepts directly; migrate and
-resolve it first (see [reference migration](docs/manual/08-reference-migration.md)).
+Legacy `otter.yaml` is an authoring format that **neither executor accepts
+directly**. To run it, migrate it into a canonical project root, resolve a run,
+and execute that snapshot:
+
+```bash
+otter init migrated
+otter config migrate \
+  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --output migrated/project.yaml \
+  --reference-root /shared/otter/references \
+  --reference-primary hg19@GRCh37.p13-gencode-v19
+
+otter config resolve --project migrated/project.yaml \
+  --reference-root /shared/otter/references --backend local
+
+otter run --config migrated/runs/<run-id>/run.yaml \
+  --executor snakemake --dry-run --foreground
+```
+
+`config migrate` writes project intent only, which is why it needs a canonical
+root that already carries the pinned workflow assets. See
+[reference migration](docs/manual/08-reference-migration.md).
 
 ## Components
 

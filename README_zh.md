@@ -26,14 +26,14 @@
 Otter 将 FASTQ 和样本信息转换为经过校验的分析项目，并支持本地或 SLURM 执行、后台任务管理、断点恢复和可审计产物发布。
 
 <p align="center">
-  <img src="./docs/otter-workflow-stack.svg" width="100%" alt="Otter 从项目控制、Craftmake、Enva、领域算子到 Bamdriver 的工作流体系图">
+  <img src="./figs/otter-workflow-stack.svg" width="100%" alt="Otter 从项目控制、Craftmake、Enva、领域算子到 Bamdriver 的工作流体系图">
 </p>
 
 ## 它解决什么问题
 
 - 通过 `init` 初始化项目，通过 `create` 扫描 FASTQ、校验配对并生成分析配置。
 - 支持 RRBS、WGBS、RNA-seq、BS-PDX 和 RNA-PDX 场景。
-- 当前 Snakemake 路径支持本地执行和 SLURM 执行，并可覆盖步骤级 CPU、内存和分区。
+- 支持本地执行与 SLURM 执行。backend 与每个 phase 的 CPU、内存、分区边界在解析 run 时固定，snapshot 在运行时具有权威性。
 - 通过 `task list`、`task status`、`task logs`、`task stop` 和 `task report` 管理后台运行。
 - 将规范项目文件解析为带 reference、资源和运行身份的不可变 `otter.run/v1` snapshot。
 - 在运行边界验证 artifact manifest 和 checksum。
@@ -51,11 +51,7 @@ otter → craftmake → enva → 算子 → bamdriver
   └─ 项目、配置、工作流和任务控制面
 ```
 
-当前运行时明确采用双轨模型：已有生产流程使用 Snakemake 兼容路径；`craftmake` 是正在接入和验证的原生 Go 执行层。Otter 不声称 Snakemake 已经被完全移除。
-
-## 证据与发布边界
-
-Gate 6 已接受的范围包括有界 executor 比较、校正后的 read/BAM 分类证据，以及 Methx/Methrix 科学 parity。它**不**代表生产规模吞吐已获批准、不代表新的七输入 legacy-equivalent matrix 已完成、不代表 WGBS 已完成完整资格认证，也不代表 Snakemake 已被普遍替换。详见`工作流目录`和 `Gate 6 证据登记表`。
+当前运行时明确采用双轨模型：已有生产流程使用 Snakemake 兼容路径；`craftmake` 是正在接入和验证的原生 Go 执行层。
 
 ## 快速上手
 
@@ -88,23 +84,36 @@ go build -o otter .
 ### 创建并运行兼容路径项目
 
 ```bash
-otter init my_project
+otter init my_project --legacy
 
-otter create \
+otter create --legacy \
   --fastq /data/fastq \
   --mode RRBS \
   --pdata /data/samples.xlsx \
   --output my_project/userspace \
   --jobid demo_rrbs
-
-otter run \
-  --config my_project/userspace/demo_rrbs/config/otter.yaml \
-  --executor snakemake \
-  --engine local \
-  --foreground
 ```
 
-集群运行时将 `--engine local` 替换为 `--engine slurm`，并根据集群设置分区和资源。默认运行会创建后台任务并打印 task ID：
+legacy 的 `otter.yaml` 只是 authoring 格式，**两个执行层都不直接接受**。要运行它，先迁移到规范项目根目录、解析 run，然后执行该 snapshot：
+
+```bash
+otter init migrated
+otter config migrate \
+  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --output migrated/project.yaml \
+  --reference-root /shared/otter/references \
+  --reference-primary hg19@GRCh37.p13-gencode-v19
+
+otter config resolve --project migrated/project.yaml \
+  --reference-root /shared/otter/references --backend local
+
+otter run --config migrated/runs/<run-id>/run.yaml \
+  --executor snakemake --dry-run --foreground
+```
+
+`config migrate` 只写出项目意图，所以它需要一个已经带有 pinned workflow assets 的规范项目根目录。详见 [reference migration](docs/manual/08-reference-migration.md)。
+
+backend 与每个 phase 的资源边界在解析时固定，运行时参数不能覆盖。默认运行会创建后台任务并打印 task ID：
 
 ```bash
 otter task list
@@ -127,6 +136,23 @@ otter run \
 
 `craftmake` 要求不可变的 `otter.run/v1` snapshot。executor、backend、phase、reference 和资源边界必须在运行前解析；运行时参数不能静默覆盖 snapshot。
 
+snapshot 把所有路径都记录为绝对路径，因此 `otter run` 不必在项目目录中启动：传绝对路径的 `--config`，在任何目录都能运行。唯一的例外是 `--run-id`，它是在当前工作目录下解析的；请配合 `--project-dir` 使用，或先 `cd` 进入项目。
+
+`otter build` 把 init、create、validate 和 resolve 串成一步，在进入执行前停止，并打印 snapshot 路径。默认使用 craftmake 执行层；加 `--executor snakemake` 则在 snapshot 中记录 Snakemake 兼容执行层。
+
+```bash
+otter build \
+  --project-root my_project \
+  --fastq /data/fastq \
+  --pdata /data/samples.csv \
+  --mode RRBS \
+  --reference-root /shared/otter/references \
+  --reference-primary hg19@GRCh37.p13-gencode-v19 \
+  --backend local
+```
+
+executor 属于 run snapshot，因此该选择不会写进 `project.yaml`，而且可以在不同 run 之间不同。已经存在 `project.yaml` 的目录会被拒绝而不是被覆盖：请改用 `otter config resolve` 从现有项目再解析一个 run。
+
 ## 组件
 
 | 组件 | 角色 | 仓库 |
@@ -147,14 +173,11 @@ otter run \
 
 ## 文档入口
 
-- [文档中心](docs/README.md)：当前契约、教程、运维和历史证据地图。
+- [文档中心](docs/README.md)：当前契约、教程和 schema 的入口。
 - [用户手册](docs/manual/README.md)：安装、数据准备、快速上手、分析模式、高级用法、组件和 FAQ。
-- `架构`
-- `工作流目录`
-- `配置与 run snapshot`
-- `安装`
-- `构建与子仓库` · `子模块构建指南`
-- `发布准备`：当前发布清单与延期证据边界
+- [示例](docs/examples/)：完整的项目配置、reference、lock 文件和 run snapshot。
+- [Schema](docs/schema/)：项目配置、run snapshot、reference、lock 和 artifact manifest 的 JSON Schema。
+- [离线 e2e 演练](scripts/e2e/otter_e2e.sh)：在无网络环境下驱动真实二进制，验证 authoring、build、site、配对和迁移契约。
 - [Methx → 原生 Methrix HDF5 转换函数](methx/scripts/export_methrix_hdf5.R)
 
 ## 开发
@@ -166,10 +189,6 @@ go vet ./...
 ```
 
 Rust 子仓库使用 `rust_build` 环境。每个子仓库都是独立仓库，具体构建和测试命令以各自 README 为准。
-
-## 命名说明
-
-当前产品名是 `otter`。部分源码中的命令和状态符号仍是兼容期的 `xdxtools` 名称；文档会明确区分产品名和实现别名，不把迁移期状态写成已完成。
 
 ## 许可证
 

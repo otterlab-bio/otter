@@ -251,6 +251,7 @@ Snakemake assets are retained as explicit compatibility archives. A `legacy-equi
 
 ## Repository references
 
-- Root integration: `docs/workflow-catalog.md`, `docs/reference-registry.md`, and `docs/execution-contract.md`.
-- Craftmake implementation: `craftmake/README.md`, `craftmake/workflows/`, and `craftmake/internal/`.
+- Root integration: `README.md`, `docs/manual/` (especially chapters 3 and 5), and `internal/craftmake/` for the caller side of the protocol.
+- Workflow catalog: `craftmake/workflows/` — one directory per scenario family, each with its phase YAML.
 - Immutable snapshot schema: `docs/schema/otter-run-v1.schema.json`.
+- Craftmake implementation: `craftmake/README.md`, `craftmake/workflows/`, and `craftmake/internal/`.

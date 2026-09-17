@@ -18,13 +18,25 @@ Do not open with a long architecture explanation, a contributor guide, or a tabl
 
 ## Root documentation layers
 
+`docs/` is deliberately small. It holds only:
+
 - Root README: product value, stack, release boundary, minimal install/run path, and links.
-- `docs/README.md`: current documentation map and maintenance policy.
-- `docs/manual/`: task-oriented tutorial for users.
-- `docs/*.md`: current contracts, architecture, operations, release readiness, and evidence indexes.
-- `docs/active_context.md`: concise current-state index; detailed experiment records belong in linked reports.
-- `docs/review/`, `docs/archive/`, `docs/notes/`: historical evidence, retained without branding rewrites.
+- `docs/README.md`: the hub — what to read for a given need, and the maintenance policy.
+- `docs/manual/`: the task-oriented tutorial for users, in reading order.
+- `docs/examples/`: a complete canonical project, reference release, lock file, run snapshot, and samples manifest.
+- `docs/schema/`: the JSON Schemas for configuration, snapshots, references, locks, and artifacts.
 - `skills/otter/`: agent operating rules and validation matrix.
+
+Earlier revisions of this repository carried architecture, operations, and
+evidence documents directly under `docs/`. Those were removed to leave one
+coherent user-facing surface, and their content now lives in the owning
+submodule, in `AGENTS.md`/`CLAUDE.md`, or in dated records held outside `docs/`.
+Two consequences follow:
+
+- Do not reintroduce a top-level `docs/*.md` file without adding it to the hub
+  index in the same change.
+- A hub entry that names a document which does not exist is a defect, not a
+  placeholder. The hub lists what is there.
 
 ## Submodule README minimum
 
@@ -82,17 +94,20 @@ Watch for near-miss flag pairs, which are the ones that survive review:
 | `--state-dir` / `--state` | `run`, `plan`, `validate` take `--state-dir`; `status`, `logs`, `report`, `resume`, `cancel` take `--state <state.sqlite>` + `--run` |
 | `--workers` / `--max-parallel` | Separate flags; `--workers` wins and `--max-parallel` is the zero-value fallback |
 
-A documented stage count can also drift. `scripts/e2e/otter_e2e.sh` skips the
-`otter-install` leg unless `--installer` is passed, so a rehearsal reporting fewer
-stages than an older record is not necessarily a regression.
+A documented stage count can also drift, and three legs of
+`scripts/e2e/otter_e2e.sh` are conditional: `otter-install` runs only with
+`--installer`, while the legacy and `otter build` legs run by default and are
+dropped with `--skip-legacy` and `--skip-build`. State which flags produced a
+count whenever you record one, and verify the count against a real run rather than
+adjusting the number to match the last document.
 
 ## Remote host documentation
 
-Remote operational docs (for example `docs/gate6-paracloud-operations.md`) should
-record the connection name and a read-only command shape, and should not paste
-credentials, tokens, or private keys. When a remote procedure is documented,
-state the working directory and the expected artifact paths on the remote side,
-because those are the things a reader cannot infer from local context.
+Remote operational docs should record the connection name and a read-only command
+shape, and should not paste credentials, tokens, or private keys. When a remote
+procedure is documented, state the working directory and the expected artifact
+paths on the remote side, because those are the things a reader cannot infer from
+local context.
 
 Two operational traps are worth repeating wherever remote runs are documented:
 

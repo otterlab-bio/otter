@@ -1,73 +1,62 @@
 # Otter documentation hub
 
-This directory is the source of truth for current user-facing contracts, operational guidance, and evidence boundaries. Documents are grouped by lifecycle rather than by the date they were written.
+This directory holds the current user-facing documentation: the task-oriented manual, a complete set
+of worked examples, and the JSON Schemas. Every command and path here is checked against the owning
+repository's source before it is published.
 
 <p align="center">
-  <img src="./otter-run-lifecycle.svg" width="100%" alt="Otter run lifecycle from project intent and inputs through immutable resolution, execution, verification, and publication">
+  <img src="../figs/otter-run-lifecycle.svg" width="100%" alt="Otter run lifecycle from project intent and inputs through immutable resolution, execution, verification, and publication">
 </p>
 
 ## Start here
 
 | Need | Read |
 | --- | --- |
-| Understand the product | `Project overview` |
-| Install a release or source checkout | `Installation` |
-| Run a first workflow | [User manual](manual/README.md) |
-| Understand the execution stack | `Architecture` |
-| Choose a workflow scenario | `Workflow catalog` |
-| Resolve canonical files into an immutable run | `Configuration`, `execution contract` |
-| Configure sites and references | `Site profiles`, `reference registry` |
-| Build the root or submodules | `Build guide`, `submodule build guide` |
-| Understand release readiness | `Release readiness` |
-| Understand accepted Gate 6 evidence | `Gate 6 comparison`, `evidence register` |
+| Install a release or source checkout | [Installation](manual/01-installation.md) |
+| Run a first workflow | [Quick start](manual/03-quickstart.md) |
+| Prepare FASTQ inputs and sample metadata | [Data preparation](manual/02-data-preparation.md) |
+| Choose a workflow scenario | [Analysis modes](manual/04-analysis-modes.md) |
+| Resolve canonical files into an immutable run | [Advanced usage](manual/05-advanced-usage.md) |
+| Migrate a legacy project to canonical v1 | [Reference migration](manual/08-reference-migration.md) |
+| Look up a bundled operator or CLI | [Subtools](manual/06-subtools.md) |
+| Troubleshoot a failure | [FAQ](manual/07-faq.md) |
 
-## Current documentation layers
+## The manual
 
-### Product and user guidance
+The manual is the task-oriented sequence. Read it in order for a first run, or jump to a chapter:
 
-- `Project overview` — product hierarchy, current/target runtime, scenarios, and repository layout.
-- `Installation` — release/source install, environments, verification, and troubleshooting.
-- [User manual](manual/README.md) — task-oriented tutorial sequence for new users.
-- `Requirements` — current product requirements and boundaries.
+1. [Installation](manual/01-installation.md) — release and source install, runtime environments, verification.
+2. [Data preparation](manual/02-data-preparation.md) — FASTQ pairing rules, pdata format, sample naming.
+3. [Quick start](manual/03-quickstart.md) — `init → create → config resolve → run` for both tracks, plus `otter build`.
+4. [Analysis modes](manual/04-analysis-modes.md) — RRBS, WGBS, RNA-seq, BS-PDX, and RNA-PDX.
+5. [Advanced usage](manual/05-advanced-usage.md) — site profiles, backends, run overrides, task control.
+6. [Subtools](manual/06-subtools.md) — the bundled operators and when each one runs.
+7. [FAQ](manual/07-faq.md) — common failures and what they mean.
+8. [Reference migration](manual/08-reference-migration.md) — the legacy archive and the registry contract.
 
-### Contracts and reference
+## Reference material in this directory
 
-- `Architecture`
-- `Configuration`
-- `Execution contract`
-- `Project layout`
-- `Site profiles`
-- `Reference registry`
-- [Reference migration](manual/08-reference-migration.md)
-- `Workflow catalog`
-- [Schema directory](schema/)
+- [Worked examples](examples/) — a complete canonical project, reference release, lock file, run snapshot, and samples manifest.
+- [Schemas](schema/) — the JSON Schemas for project configuration, run snapshots, references, locks, and artifact manifests.
 
-### Engineering and operations
+## Contracts outside this directory
 
-- `Build guide`
-- `Submodule build guide`
-- `Benchmark plan`
-- `Paracloud operations`
-- [Offline e2e rehearsal](../scripts/e2e/otter_e2e.sh) — the `init → create → config resolve → run` chain, the site-profile leg, and the executor pairing contract, run without network access.
+These are authoritative for their own subject and are not duplicated here:
+
+- [Repository guidelines](../AGENTS.md) — CI conventions, module organization, and the validation commands CI runs.
+- [Project instructions](../CLAUDE.md) — product hierarchy, the naming contract, and the dual-track runtime state.
+- [Offline e2e rehearsal](../scripts/e2e/otter_e2e.sh) — the authoring, build, site-profile, pairing, and migration contracts, asserted against the real binaries without network access.
 - [Otter repository skill](../skills/otter/SKILL.md) — repository boundaries, toolchain matrix, validation strategy, and safe operating rules.
 - [Craftmake workflow skill](../skills/craftmake/SKILL.md) — controller usage, YAML workflow authoring, and compatibility boundaries.
-
-### Evidence and project decisions
-
-- `Current context` — compact current-state handoff.
-- `Gate 6 evidence register` — machine-readable acceptance boundary.
-- `Gate 6 comparison report` — accepted parity and limitation summary.
-- `Review index` — dated reviews and remediation evidence.
-- `Archive` — historical implementation records retained as evidence.
-- `Notes` — dated execution handoffs and working records.
+- [Workflow catalog](../craftmake/workflows/) — the Craftmake workflow families and their phases.
 
 ## Documentation rules
 
 - Current product docs use `otter`, `craftmake`, `enva`, and the current operator names.
 - External standards and scientific names such as FASTQ, FastQC, MultiQC, Bismark, Methrix, HTSeq, rMATS, BAM, and HDF5 are not renamed.
-- Historical review, archive, and dated note files preserve the terminology and claims that were true when the evidence was recorded.
-- Any deferred Gate 6 work remains explicitly deferred and must not be promoted to a release claim without a new evidence boundary.
-- Commands and output paths must be checked against the owning repository's current source before being copied into tutorials.
+- Historical source symbols and old asset names such as `xdxtools`, `fastqc-rs`, `xenofilter-go`, `Paireads`, `htseq2matrix-go`, `gomats`, `methrix-cli`, and `bamdriver-go` are named only where compatibility requires them.
+- Deferred work stays explicitly deferred and is never promoted to a release claim without a new evidence boundary.
+- Every command and output path in a tutorial must be checked against the owning repository's current source before it is published.
 
 ## Documentation maintenance checklist
 
@@ -76,5 +65,5 @@ When changing a user-facing CLI or output contract:
 1. Update the owning submodule README and the root component reference if the integration boundary changes.
 2. Update the relevant manual chapter and link it from this hub.
 3. Update `skills/otter/` when the build matrix, repository map, or safe operating rules change.
-4. Run the README image/link audit and a repository-wide link/terminology check.
+4. Run the README image and link audit, plus a repository-wide link and terminology check.
 5. Keep release limitations visible near the first-use path.

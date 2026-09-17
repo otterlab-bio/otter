@@ -49,15 +49,25 @@ Inspect site availability and the requested envelope:
 ```bash
 sinfo
 squeue -u "$(whoami)"
+
+# what the run actually asked for
+sed -n '/^execution:/,/^samples:/p' \
+  my_project/runs/<run-id>/run.yaml
+
+# re-plan without submitting
 otter run \
-  --config my_project/userspace/<jobid>/config/otter.yaml \
-  --executor snakemake \
-  --engine local \
-  --dry-run \
-  --foreground
+  --config my_project/runs/<run-id>/run.yaml \
+  --executor craftmake --phase step1 --dry-run --foreground
 ```
 
-Use the dry-run to distinguish a workflow/configuration problem from a scheduler submission problem. Compare partition, account/QOS, CPU, memory, and checker settings with your cluster policy.
+Use the dry-run to distinguish a workflow/configuration problem from a scheduler
+submission problem. Compare partition, account/QOS, CPU, memory, and checker
+settings with your cluster policy.
+
+Remember that the envelope is fixed in the snapshot, so the run-time
+`--slurm-partition`, `--slurm-cores`, and `--stepN-*` flags are refused. If the
+envelope is wrong, edit `resources:` in `project.yaml` or the site profile and
+**resolve a new run**; do not retry the same snapshot with a different flag.
 
 ## Why did `methx` report an HDF5 error?
 
@@ -73,18 +83,31 @@ If the failure occurs during a source build, follow the native build instruction
 
 ## How do I inspect or resume a background run?
 
+A run always executes from a snapshot, so name the snapshot rather than a legacy
+configuration file:
+
 ```bash
 otter task list --all
 otter task status <task-id>
 otter task logs <task-id> --follow
+
+# without --foreground, Otter submits a background task and prints its task ID
 otter run \
-  --config my_project/userspace/<jobid>/config/otter.yaml \
-  --executor snakemake \
-  --engine local \
-  --foreground
+  --config my_project/runs/<run-id>/run.yaml \
+  --executor craftmake --phase step1 --backend local
 ```
 
-For a canonical v1 run, recover through the immutable snapshot and Craftmake controls described in the `execution contract`.
+Recovery uses the run identity in the snapshot. Craftmake keys one row per
+phase-scoped run, so resume against the same snapshot and phase:
+
+```bash
+craftmake resume \
+  --state my_project/runs/<run-id>/state/state.sqlite \
+  --run <run-id>--step1 --gate
+```
+
+See the [Craftmake skill](../../skills/craftmake/SKILL.md) for the full
+controller sequence and the `--gate` requirement.
 
 ## Why do docs still mention FastQC, Bismark, Methrix, or rMATS?
 

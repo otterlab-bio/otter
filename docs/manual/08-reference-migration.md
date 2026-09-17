@@ -74,8 +74,8 @@ $OTTER_REFERENCE_ROOT/
 
   The key is the reference **role** (`primary`, `secondary`, `graft`, `host`), not the
   reference id, and the digest field is `manifest_digest`. A release label is
-  mandatory and named `<assembly>-<annotation-source>-<annotation-version>`; see
-  the `reference registry contract`.
+  mandatory and named `<assembly>-<annotation-source>-<annotation-version>`; the
+  layout and digest contract are defined in section 2 above.
 
 ---
 
@@ -208,4 +208,4 @@ In practice `otter create --reference-primary hg19@GRCh37.p13-gencode-v19 --refe
 
 ---
 
-[Back to the user manual](README.md) · `Reference registry specification`
+[Back to the user manual](README.md) · [Next: FAQ](07-faq.md)

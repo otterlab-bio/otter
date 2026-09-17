@@ -43,18 +43,87 @@ that must be consistent:
   `--legacy` is that loop promised; mixed use is refused with guidance.
 - A project carrying both markers is an error rather than a silent preference.
 
-`otter create` resolves its declared references against the registry
-(`--reference-root`, `--reference-primary`, or `--reference-graft`/
-`--reference-host` for PDX) and writes `references.lock.yaml`, so the result is
-immediately resolvable. `otter config migrate` converts a legacy project to v1
-intent, but migration produces project intent only: it needs a canonical project
-root that already carries the pinned workflow assets the resolver digests.
+`otter build` chains the canonical steps — init, create, validate, resolve — and
+stops before execution, printing the snapshot path. It is a shortcut over the
+same functions the standalone commands call, not a second authoring path, and the
+offline rehearsal asserts the two produce byte-identical authoring artifacts. It
+defaults to the Craftmake executor; `--executor snakemake` records the Snakemake
+compatibility executor in the snapshot instead. A directory that already holds a
+`project.yaml` is refused rather than overwritten, because rewriting project
+intent in place would silently invalidate every snapshot already resolved from
+it; use `otter config resolve` to freeze a further run.
 
-The executor is **not** chosen by the track. It is fixed in the immutable
-`runs/<run-id>/run.yaml`, and `--executor` must agree with the snapshot:
-a canonical snapshot selects Craftmake, and a migrated legacy snapshot selects
-Snakemake. A raw legacy `otter.yaml` is an authoring format that neither
-executor accepts until it is migrated and resolved.
+### Canonical project layout
+
+```text
+project/
+├── project.lock.yaml     # track marker + pinned asset digests
+├── workflows/            # packaged Snakefiles (pinned)
+│   └── rules/            # Snakemake compatibility rules (pinned)
+├── environments/  schemas/
+└── runs/                 # one immutable run.yaml per resolved run
+```
+
+The rules live under `workflows/` rather than at the project root because a
+Snakefile's `include:` directives resolve relative to **the Snakefile's own
+directory**, not the working directory. Keeping the rules beside the Snakefiles
+is what lets a canonical project run with nothing written into the project root.
+The legacy track still puts its Snakefiles at the project root, which is why the
+executor's search order checks the current directory before `workflows/`.
+
+### What is fixed, and when
+
+Four rules explain most of the "why was this refused" questions. Docs that violate
+them look plausible and fail on first use, so check a change against all four:
+
+1. **The snapshot is the only thing an executor consumes.** A raw legacy
+   `config/otter.yaml` is refused by *both* executors with migration guidance. The
+   legacy track is therefore authoring-only: to run it, `otter init` a canonical
+   root, `otter config migrate` into it, `config resolve`, then run. Never document
+   `otter run --config .../config/otter.yaml`.
+2. **The backend and the resource envelope are fixed at resolve time.** They come
+   from `project.yaml`'s `resources:` merged with the selected site profile
+   (`mergeResources(project.Resources, siteResources)`), then validated against the
+   target. At run time `--backend`/`--engine`, every `--stepN-*` and `--slurm-*`
+   resource flag, and `--copy-fastq` are **refused**; only `--parallel-jobs`,
+   `--load-ratio`, and `--workflow` remain settable. Resource units are `MiB`/`GiB`
+   and `HH:MM:SS` under `resources.defaults` / `resources.phases.<phase>`.
+3. **Editing `project.yaml` invalidates existing runs.** The snapshot pins the
+   project digest, so a later `otter run` reports `run snapshot drift detected` and
+   refuses. Resolve a new run after any intent change.
+4. **Legacy-only flags are silently ignored on the canonical track.** `--species1`,
+   `--genome1-*`/`--genome2-*`, `--gtf1`/`--gtf2`, and `--star-index1`/`-2` affect
+   only `--legacy`. `--species2` merely *signals* PDX intent; the references
+   themselves must come from `--reference-graft`/`--reference-host`, and the host
+   and graft species come from the releases' own organism metadata. A canonical
+   `create` that names no reference role fails with
+   `scenario "rrbs" requires --reference-primary as id@release`.
+
+Use one example reference identity across the docs. The established pair is
+`hg38@GRCh38.p14` and `mm10@GRCm38.p6` (with `hg19@GRCh37.p13-gencode-v19` for
+migration examples); inventing a new one per chapter makes the manual look
+inconsistent for no benefit. The release-label convention
+`<assembly>-<annotation-source>-<annotation-version>` is guidance, not enforcement
+— the schema only requires `^[A-Za-z0-9._-]+$`.
+
+### A run does not depend on the working directory
+
+The snapshot pins every path absolutely — run root, work/results/logs/state, the
+project config, the pinned workflow assets, the resolved release, and each
+sample's FASTQ with its checksum. So prefer suggesting the absolute snapshot path
+`otter build` prints; it works from any directory, and the executors place
+themselves correctly on their own (the Snakemake path `os.Chdir`s into the project
+directory; the Craftmake worker is started with it as its working directory).
+`OTTER_REFERENCE_ROOT` is a build-time input and is not read at run time.
+
+Only three inputs resolve against the caller's shell, and they are the ones to get
+wrong when writing an example:
+
+- `--config` — relative to the working directory; use an absolute path.
+- `--run-id` — expands under the working directory, so it *does* assume the caller
+  is in the project. Pair it with `--project-dir` or `cd` first.
+- `--catalog` — relative to the working directory when supplied. Omitting it is
+  usually correct, because the snapshot already pins the catalog.
 
 `otter site generate` writes a site profile from observed machine facts. It
 discovers the toolchain, cluster name, partitions, and root candidates, but
@@ -99,8 +168,8 @@ For the root repository:
 
 - Update `README.md` and `README_zh.md` together when user-facing setup or product language changes.
 - Link current docs through `docs/README.md` and the task-oriented manual through `docs/manual/README.md`.
-- Keep `docs/archive/`, `docs/review/`, and dated `docs/notes/` as historical evidence unless a specific correction is requested.
-- Preserve visible limitations around Gate 6, WGBS, production scale, deferred matrices, and the Snakemake/Craftmake boundary.
+- `docs/` holds only the manual, `examples/`, `schema/`, and the hub `README.md`. Do not add a new top-level doc file without adding it to the hub index at the same time; an index entry that points at nothing is worse than no entry.
+- Preserve visible limitations around WGBS, production scale, deferred matrices, and the Snakemake/Craftmake boundary.
 
 For a submodule:
 
@@ -155,9 +224,22 @@ go build -o /tmp/otter . && (cd craftmake && go build -o /tmp/craftmake ./cmd/cr
 bash scripts/e2e/otter_e2e.sh --otter /tmp/otter --craftmake /tmp/craftmake
 ```
 
-It is offline: it never downloads a genome and never runs an index builder. It
-does skip the `otter-install` leg unless you also pass `--installer <path>`, so a
-stage count below the documented total is expected without one.
+It is offline: it never downloads a genome and never runs an index builder. Three
+legs are optional, so a stage count below the documented total is not itself a
+failure:
+
+- the `otter-install` leg runs only with `--installer <path>`;
+- the legacy compatibility leg runs by default and is skipped with `--skip-legacy`;
+- the `otter build` leg runs by default and is skipped with `--skip-build`.
+
+The build leg is a comparison, not a smoke test. It authors each scenario twice —
+once through the manual chain, once through `otter build` — and fails if
+`project.yaml`, `samples.tsv`, or `references.lock.yaml` differ. Run snapshots are
+deliberately not compared, because each embeds its own run directory and
+timestamp. Both paths must read the *same* input tree: `samples.tsv` records
+inputs relative to the project root, so giving the two paths separate input
+directories makes the manifest differ for a reason unrelated to the authoring
+code.
 
 Never claim a command was tested when only the documentation was edited. Never change a submodule and silently leave the parent gitlink stale.
 
