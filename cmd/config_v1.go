@@ -68,9 +68,23 @@ func newConfigResolveCommand() *cobra.Command {
 }
 
 func runConfigResolve(command *cobra.Command, flags configResolveFlags) error {
+	snapshotPath, err := resolveRunSnapshot(flags)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(command.OutOrStdout(), snapshotPath)
+	return nil
+}
+
+// resolveRunSnapshot writes the immutable run snapshot and returns its path.
+//
+// It is separate from the cobra wrapper so "otter build" can chain into resolve
+// and report the snapshot it produced, while "otter config resolve" keeps
+// printing the path for scripting.
+func resolveRunSnapshot(flags configResolveFlags) (string, error) {
 	projectPath, err := filepath.Abs(flags.ProjectPath)
 	if err != nil {
-		return fmt.Errorf("resolve project path: %w", err)
+		return "", fmt.Errorf("resolve project path: %w", err)
 	}
 	projectRoot := filepath.Dir(projectPath)
 	var directory runstate.Directory
@@ -79,12 +93,12 @@ func runConfigResolve(command *cobra.Command, flags configResolveFlags) error {
 	} else {
 		createdAt, parseErr := runstate.CreatedAtFromID(flags.RunID)
 		if parseErr != nil {
-			return parseErr
+			return "", parseErr
 		}
 		directory, err = runstate.CreateDirectoryWithID(projectRoot, flags.RunID, createdAt)
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 	cleanup := true
 	defer func() {
@@ -114,15 +128,14 @@ func runConfigResolve(command *cobra.Command, flags configResolveFlags) error {
 		ParentRunID:       flags.ParentRunID,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	snapshotPath, err := runstate.WriteSnapshot(directory, snapshot)
 	if err != nil {
-		return err
+		return "", err
 	}
 	cleanup = false
-	fmt.Fprintln(command.OutOrStdout(), snapshotPath)
-	return nil
+	return snapshotPath, nil
 }
 
 func newConfigMigrateCommand() *cobra.Command {

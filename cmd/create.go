@@ -187,6 +187,117 @@ func validateCreateOutputDir(outputDir string) error {
 	return nil
 }
 
+// sampleIntakeRequest carries the inputs that decide which FASTQ files become
+// samples. It exists so "otter create" and "otter build" run one intake routine
+// instead of each reading the package-level flags, which would let the two
+// entry points drift in how they pair or reject samples.
+type sampleIntakeRequest struct {
+	FastqDir  string
+	Suffix1   string
+	Suffix2   string
+	PdataFile string
+}
+
+// sampleIntake is the validated result of scanning a FASTQ directory. Sample
+// names are preserved in scan order so every downstream record keeps the same
+// ordering as the input directory.
+type sampleIntake struct {
+	PairedSamples []input.PairedSample
+	PData         *input.PData
+	SampleNames   []string
+}
+
+// collectSampleIntake scans, pairs, loads pdata, and validates. Every rejection
+// that "otter create" reports for a malformed directory originates here.
+func collectSampleIntake(request sampleIntakeRequest) (sampleIntake, error) {
+	if _, err := os.Stat(request.FastqDir); os.IsNotExist(err) {
+		return sampleIntake{}, fmt.Errorf("FASTq directory does not exist: %s", request.FastqDir)
+	}
+
+	logger.Infof("Scanning FASTQ directory: %s", request.FastqDir)
+	scanner := input.NewScanner(&input.ScanOptions{
+		FastqDir: request.FastqDir,
+		Suffix1:  request.Suffix1,
+		Suffix2:  request.Suffix2,
+	})
+
+	samples, err := scanner.Scan()
+	if err != nil {
+		return sampleIntake{}, fmt.Errorf("failed to scan FASTQ files: %w", err)
+	}
+	if len(samples) == 0 {
+		return sampleIntake{}, fmt.Errorf("no FASTQ files found in directory")
+	}
+	logger.Infof("Found %d FASTQ files", len(samples))
+
+	pairedSamples, err := scanner.PairSamples(samples, nil)
+	if err != nil {
+		return sampleIntake{}, fmt.Errorf("failed to pair samples: %w", err)
+	}
+
+	validPairs := make([]input.PairedSample, 0, len(pairedSamples))
+	for _, pairedSample := range pairedSamples {
+		if pairedSample.Valid {
+			validPairs = append(validPairs, pairedSample)
+		}
+	}
+	if len(validPairs) == 0 {
+		return sampleIntake{}, fmt.Errorf("no valid paired samples found. Check file naming conventions")
+	}
+	logger.Infof("Found %d valid paired samples", len(validPairs))
+
+	var pdata *input.PData
+	if request.PdataFile != "" {
+		logger.Infof("Loading pdata file: %s", request.PdataFile)
+		parser := input.NewPDataParser()
+		pdata, err = parser.Load(request.PdataFile)
+		if err != nil {
+			return sampleIntake{}, fmt.Errorf("failed to load pdata: %w", err)
+		}
+		logger.Infof("Loaded pdata with %d samples", len(pdata.Samples))
+	}
+
+	validator := input.NewValidator()
+	validationResult := validator.ValidateInput(request.FastqDir, request.PdataFile, validPairs, pdata)
+	for _, warning := range validationResult.Warnings {
+		logger.Warn(warning)
+	}
+	if !validationResult.Valid {
+		for _, validationError := range validationResult.Errors {
+			logger.Error(validationError)
+		}
+		return sampleIntake{}, fmt.Errorf("validation failed. Please fix the errors above")
+	}
+
+	sampleNames := make([]string, len(validPairs))
+	for index, pairedSample := range validPairs {
+		sampleNames[index] = pairedSample.Name
+	}
+
+	return sampleIntake{
+		PairedSamples: validPairs,
+		PData:         pdata,
+		SampleNames:   sampleNames,
+	}, nil
+}
+
+// generateSampleAdapters derives the per-sample adapters a project records.
+// Both tracks call it so a project never pins an adapter that disagrees with
+// its own samples.
+func generateSampleAdapters(modeStr string, sampleNames []string, pdata *input.PData) ([]string, []string, error) {
+	adapterGenerator := input.NewAdapterGenerator(input.AdapterGeneratorOptions{
+		BaseAdapter1: "AGATCGGAAGAGC",
+		BaseAdapter2: "AGATCGGAAGAGC",
+		Mode:         modeStr,
+	})
+	adapter1, adapter2, err := adapterGenerator.GenerateAdapters(sampleNames, pdata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate adapters: %w", err)
+	}
+	logger.Infof("Generated adapters for %d samples", len(sampleNames))
+	return adapter1, adapter2, nil
+}
+
 func runCreate(cmd *cobra.Command, args []string) error {
 	logger.Info("Creating analysis project...")
 
@@ -201,101 +312,31 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// 1. Validate FASTQ directory exists
-	if _, err := os.Stat(createFastqDir); os.IsNotExist(err) {
-		return fmt.Errorf("FASTq directory does not exist: %s", createFastqDir)
-	}
-
-	// 2. Scan FASTQ files
-	logger.Infof("Scanning FASTQ directory: %s", createFastqDir)
-	scanner := input.NewScanner(&input.ScanOptions{
-		FastqDir: createFastqDir,
-		Suffix1:  createSuffix1,
-		Suffix2:  createSuffix2,
+	intake, err := collectSampleIntake(sampleIntakeRequest{
+		FastqDir:  createFastqDir,
+		Suffix1:   createSuffix1,
+		Suffix2:   createSuffix2,
+		PdataFile: createPdataFile,
 	})
-
-	samples, err := scanner.Scan()
 	if err != nil {
-		return fmt.Errorf("failed to scan FASTQ files: %w", err)
+		return err
 	}
+	validPairs := intake.PairedSamples
+	pdata := intake.PData
+	sampleNames := intake.SampleNames
 
-	if len(samples) == 0 {
-		return fmt.Errorf("no FASTQ files found in directory")
-	}
-
-	logger.Infof("Found %d FASTQ files", len(samples))
-
-	// 3. Pair samples
-	pairedSamples, err := scanner.PairSamples(samples, nil)
-	if err != nil {
-		return fmt.Errorf("failed to pair samples: %w", err)
-	}
-
-	// Filter valid pairs
-	validPairs := make([]input.PairedSample, 0, len(pairedSamples))
-	for _, ps := range pairedSamples {
-		if ps.Valid {
-			validPairs = append(validPairs, ps)
-		}
-	}
-
-	if len(validPairs) == 0 {
-		return fmt.Errorf("no valid paired samples found. Check file naming conventions")
-	}
-
-	logger.Infof("Found %d valid paired samples", len(validPairs))
-
-	// 4. Load pdata if provided
-	var pdata *input.PData
-	if createPdataFile != "" {
-		logger.Infof("Loading pdata file: %s", createPdataFile)
-		parser := input.NewPDataParser()
-		pdata, err = parser.Load(createPdataFile)
-		if err != nil {
-			return fmt.Errorf("failed to load pdata: %w", err)
-		}
-		logger.Infof("Loaded pdata with %d samples", len(pdata.Samples))
-	}
-
-	// 5. Validate input
-	validator := input.NewValidator()
-	validationResult := validator.ValidateInput(createFastqDir, createPdataFile, validPairs, pdata)
-
-	if len(validationResult.Warnings) > 0 {
-		for _, w := range validationResult.Warnings {
-			logger.Warn(w)
-		}
-	}
-
-	if !validationResult.Valid {
-		for _, e := range validationResult.Errors {
-			logger.Error(e)
-		}
-		return fmt.Errorf("validation failed. Please fix the errors above")
-	}
-
-	// 6. Detect PDX mode
+	// Detect PDX mode
 	pdxMode := createSpecies2 != ""
 	modeStr := strings.ToUpper(createMode)
 	if pdxMode {
 		logger.Infof("PDX mode enabled: %s + %s", createSpecies1, createSpecies2)
 	}
 
-	// 7. Derive adapters once; both tracks record them for their samples.
-	sampleNames := make([]string, len(validPairs))
-	for i, ps := range validPairs {
-		sampleNames[i] = ps.Name
-	}
-	adapterGen := input.NewAdapterGenerator(input.AdapterGeneratorOptions{
-		BaseAdapter1: "AGATCGGAAGAGC",
-		BaseAdapter2: "AGATCGGAAGAGC",
-		Mode:         modeStr,
-	})
-	adapter1, adapter2, err := adapterGen.GenerateAdapters(sampleNames, pdata)
+	// Derive adapters once; both tracks record them for their samples.
+	adapter1, adapter2, err := generateSampleAdapters(modeStr, sampleNames, pdata)
 	if err != nil {
-		return fmt.Errorf("failed to generate adapters: %w", err)
+		return err
 	}
-	logger.Infof("Generated adapters for %d samples", len(sampleNames))
 
 	if !createLegacyTrack {
 		return runCreateCanonical(cmd, modeStr, pdxMode, validPairs, pdata, adapter1, adapter2)
