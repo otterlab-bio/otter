@@ -111,6 +111,7 @@ jobs:
           DATE: ${{ github.event.head_commit.timestamp }}
         run: |
           VERSION=${VERSION#refs/tags/}
+          VERSION=${VERSION//\//-}
           LDFLAGS="-s -w -X github.com/otterlab-bio/otter/cmd.buildVersion=${VERSION#v} -X github.com/otterlab-bio/otter/cmd.buildCommit=${COMMIT:0:7} -X github.com/otterlab-bio/otter/cmd.buildDate=${DATE}"
 
           # 静态链接构建（适用于CentOS等低版本GLIBC环境）
@@ -139,8 +140,8 @@ jobs:
             --verdict "${{ job.status }}" \
             --title "OTTER — Go CI/CD build" \
             --checked "Builds the Linux amd64 OTTER binary in both link modes and uploads them as the linux-amd64 artifact." \
-            --check "Static build (low-glibc targets)|otter-\${{ github.ref_name }}-linux-amd64-static produced|see artifact|-" \
-            --check "Dynamic build (regular Linux)|otter-\${{ github.ref_name }}-linux-amd64 produced|see artifact|-" \
+            --check "Static build (low-glibc targets)|otter-<sanitized-version>-linux-amd64-static produced|see artifact|-" \
+            --check "Dynamic build (regular Linux)|otter-<sanitized-version>-linux-amd64 produced|see artifact|-" \
             --metric "Target|linux/amd64 only" \
             --metric "Link modes|static and dynamic" \
             --artifact "linux-amd64" \
