@@ -124,6 +124,12 @@ watch the task graph compile. It executes no tool and produces no scientific res
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb)
 
+Or copy the link directly:
+
+```text
+https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb
+```
+
 The notebook lives at [`notebooks/otter-colab-walkthrough.ipynb`](notebooks/otter-colab-walkthrough.ipynb).
 It takes about fifteen minutes, most of which is `enva` creating `otter-core` and
 `otter-snakemake`; set `SKIP_ENVS = True` for a faster pass that exercises authoring and planning
