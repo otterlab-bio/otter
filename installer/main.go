@@ -104,6 +104,26 @@ func run(ctx context.Context, options *config.Options) error {
 		fmt.Printf("  ✓ workflows deployed to %s\n", filepath.Join(shareDir, "workflows"))
 		fmt.Printf("  ✓ configs deployed to %s\n", filepath.Join(shareDir, "configs"))
 	}
+
+	// The environment manager reads its YAML from the install directory, so the
+	// environment definitions have to be fetched into it. They are published as
+	// release assets alongside the binaries, which is why nothing staged them
+	// locally.
+	if !options.SkipEnvs {
+		fmt.Println("  Fetching environment definitions ...")
+		for _, envFile := range config.EnvFiles {
+			url := download.ReleaseAssetURL(options.ReleasesRepo, tag, envFile)
+			destination := filepath.Join(options.InstallDir, envFile)
+			if options.DryRun {
+				fmt.Printf("  [DRY-RUN] would download %s -> %s\n", url, destination)
+				continue
+			}
+			if err := client.Download(ctx, url, destination); err != nil {
+				return fmt.Errorf("download environment definition %s: %w", envFile, err)
+			}
+			fmt.Printf("  ✓ %s\n", envFile)
+		}
+	}
 	fmt.Println()
 
 	// Step 3: Verify installed tools.
@@ -307,19 +327,31 @@ func printCompletionSummary(options *config.Options) {
 	fmt.Println("Quick start (canonical v1 project):")
 	fmt.Println()
 	fmt.Println("    otter init my_project")
+	fmt.Println("    otter build --project-root my_project --fastq data/fastq --mode RRBS \\")
+	fmt.Println("      --reference-root <registry> --reference-primary <id@release> --backend local")
+	fmt.Println()
+	fmt.Println("    build is the shortcut over init, create, config validate, and config")
+	fmt.Println("    resolve. Run those individually when you need to inspect each step:")
+	fmt.Println()
 	fmt.Println("    otter create --output my_project --fastq data/fastq --mode RRBS \\")
 	fmt.Println("      --reference-root <registry> --reference-primary <id@release>")
 	fmt.Println("    otter config resolve --project my_project/project.yaml --backend local")
+	fmt.Println()
+	fmt.Println("    Then execute the resolved snapshot:")
+	fmt.Println()
 	fmt.Println("    otter run --config my_project/runs/<run-id>/run.yaml \\")
 	fmt.Println("      --executor craftmake --phase step1 --backend local")
 	fmt.Println()
-	fmt.Println("Quick start (legacy compatibility project):")
+	fmt.Println("Legacy compatibility projects are authoring-only: neither executor accepts")
+	fmt.Println("config/otter.yaml directly. Migrate and resolve it before running:")
 	fmt.Println()
-	fmt.Println("    otter init my_project --legacy")
-	fmt.Println("    otter create --legacy --fastq data/fastq --mode RRBS \\")
-	fmt.Println("      --pdata samples.csv --output my_project/userspace --jobid demo_rrbs")
-	fmt.Println("    otter run --config my_project/userspace/demo_rrbs/config/otter.yaml \\")
-	fmt.Println("      --executor snakemake")
+	fmt.Println("    otter init migrated")
+	fmt.Println("    otter config migrate --input my_project/userspace/demo_rrbs/config/otter.yaml \\")
+	fmt.Println("      --output migrated/project.yaml \\")
+	fmt.Println("      --reference-root <registry> --reference-primary <id@release>")
+	fmt.Println("    otter config resolve --project migrated/project.yaml --backend local")
+	fmt.Println("    otter run --config migrated/runs/<run-id>/run.yaml \\")
+	fmt.Println("      --executor snakemake --dry-run --foreground")
 	fmt.Println()
 	fmt.Println("Reference genomes are managed in a shared immutable registry.")
 	fmt.Printf("Default registry root: %s\n", filepath.Join(options.Home, ".otter", "references"))

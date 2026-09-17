@@ -75,8 +75,12 @@ func (manager *Manager) Create(ctx context.Context) error {
 	files := manager.ActiveEnvFiles()
 	for _, yamlFile := range files {
 		yamlPath := filepath.Join(manager.EnvsDir, yamlFile)
-		if _, err := os.Stat(yamlPath); err != nil {
-			return fmt.Errorf("environment YAML %s not found: %w", yamlPath, err)
+		// A dry run describes the plan, so it must not require the inputs the
+		// real run would have fetched by this point.
+		if !manager.DryRun {
+			if _, err := os.Stat(yamlPath); err != nil {
+				return fmt.Errorf("environment YAML %s not found: %w", yamlPath, err)
+			}
 		}
 		envName := strings.TrimSuffix(yamlFile, ".yaml")
 		if manager.EnvaPath != "" {
@@ -86,6 +90,10 @@ func (manager *Manager) Create(ctx context.Context) error {
 			continue
 		}
 		if manager.PackageManager == "" {
+			if manager.DryRun {
+				fmt.Printf("  [DRY-RUN] no enva or conda package manager available to create %s\n", envName)
+				continue
+			}
 			return fmt.Errorf("no enva or conda package manager available to create %s", envName)
 		}
 		if err := manager.createViaPackageManager(ctx, yamlPath, envName); err != nil {
