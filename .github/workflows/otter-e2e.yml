@@ -78,15 +78,17 @@ jobs:
           site_generate="$(awk -F'|' '$1=="site/generate" {print $2}' "${stage_results}" 2>/dev/null || echo unknown)"
           site_validate="$(awk -F'|' '$1=="site/validate-reads-the-named-profile" {print $2}' "${stage_results}" 2>/dev/null || echo unknown)"
           site_consumed="$(awk -F'|' '$1=="site/profile-supplied-the-reference-root" {print $2}' "${stage_results}" 2>/dev/null || echo unknown)"
+          build_matches="$(awk -F'|' '$1=="build/all-scenarios-match-manual" {print $2}' "${stage_results}" 2>/dev/null || echo unknown)"
 
           bash scripts/ci/job-summary.sh \
             --verdict "${{ job.status }}" \
             --title "OTTER — offline end-to-end rehearsal" \
-            --checked "Runs otter-init, otter create, config resolve, and otter run --dry-run for four scenarios against a simulated reference registry, then the legacy compatibility track through config migrate, then cross-track guards. No reference genome is downloaded and no workflow task executes." \
+            --checked "Runs otter-init, otter create, config resolve, and otter run --dry-run for four scenarios against a simulated reference registry, then authors the same four scenarios through otter build and compares the artifacts, then the legacy compatibility track through config migrate, then cross-track guards. No reference genome is downloaded and no workflow task executes." \
             --check "Rehearsal stages passed|all stages pass|${passed}/${total}|-" \
             --check "Rehearsal stages failed|0|${failed}|-" \
-            --check "Canonical create resolves to immutable otter.run/v1|1 per scenario|${snapshot_contracts}/4|-" \
-            --check "Craftmake plan envelope returned|1 per scenario|${plan_envelopes}/4|-" \
+            --check "Canonical create resolves to immutable otter.run/v1|2 per scenario (manual chain + otter build)|${snapshot_contracts}/8|-" \
+            --check "Craftmake plan envelope returned|2 per scenario (manual chain + otter build)|${plan_envelopes}/8|-" \
+            --check "otter build reproduces the manual chain artifact-for-artifact|pass|${build_matches}|-" \
             --check "Cross-track, executor, and site refusals with the expected message|10|${guard_results}|-" \
             --check "Migrated legacy snapshot selects snakemake|pass|${migrated_executor}|-" \
             --check "Snakemake executor plans from the snapshot (stub runtime)|pass|${snakemake_leg}|-" \
@@ -95,9 +97,10 @@ jobs:
             --check "otter site validate reads the named profile|pass|${site_validate}|-" \
             --check "Generated profile supplies the reference root at resolve|pass|${site_consumed}|-" \
             --metric "Scenarios|rrbs, rnaseq, bs-pdx, rna-pdx" \
+            --metric "Build leg|comparison only: init, create, validate, and resolve run twice per scenario, once manually and once through otter build, and the authoring artifacts must be byte-identical" \
             --metric "Site profile|generated into a work-local HOME, consumed by config resolve" \
             --metric "Reference releases|${registry_releases} simulated releases (hg19, hg38, mm10)" \
             --metric "Reference releases|${registry_releases} simulated releases named <assembly>-<annotation>-<version>" \
             --metric "Craftmake toolchain|built from the craftmake submodule at this commit" \
             --artifact "otter-e2e-evidence" \
-            --limit "Contract compatibility only. Reference releases are simulated by stub-registry: real directory layout, reference.yaml, manifest.json, and digest relationships, verified by the production reference verifier, but FASTA/GTF payloads and index files are placeholders. The Craftmake leg stops at 'plan'; no task executed and no scientific output exists. The Snakemake compatibility leg uses a stub 'snakemake --version' executable, so it proves Otter-side dispatch and planning, not execution. The install leg runs otter-install --dry-run only. Site profiles are exercised as a LOCAL profile under a work-local HOME: the default locator, list, validate, the overwrite guard, and the resolve-time reference-root handover all run, but SLURM cluster probing (sinfo, sacctmgr, srun compute-node checks) does not, so a generated slurm profile is only structurally validated."
+            --limit "Contract compatibility only. Reference releases are simulated by stub-registry: real directory layout, reference.yaml, manifest.json, and digest relationships, verified by the production reference verifier, but FASTA/GTF payloads and index files are placeholders. The Craftmake and build legs stop at 'plan'; no task executed and no scientific output exists. The Snakemake compatibility leg uses a stub 'snakemake --version' executable, so it proves Otter-side dispatch and planning, not execution. The install leg runs otter-install --dry-run only. Site profiles are exercised as a LOCAL profile under a work-local HOME: the default locator, list, validate, the overwrite guard, and the resolve-time reference-root handover all run, but SLURM cluster probing (sinfo, sacctmgr, srun compute-node checks) does not, so a generated slurm profile is only structurally validated. The build leg compares three authoring artifacts only; run snapshots are not compared because each embeds its own run directory and timestamp."

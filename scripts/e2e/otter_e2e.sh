@@ -8,6 +8,11 @@
 #   v1 track : otter init -> otter create -> otter config resolve ->
 #              otter run --dry-run, for four scenarios, against a simulated
 #              reference registry
+#   build    : the same four scenarios authored a second way, through
+#              "otter build", compared artifact-by-artifact against the manual
+#              chain above. The shortcut's contract is equivalence, not merely
+#              success, so this leg fails if project.yaml, samples.tsv, or
+#              references.lock.yaml differ between the two paths.
 #   legacy   : otter init --legacy -> otter create --legacy -> assets verify ->
 #              config validate -> config migrate -> canonical validate ->
 #              resolve -> run --dry-run
@@ -22,8 +27,8 @@
 #   It never downloads a reference genome and never runs a genome index builder.
 #   The reference registry is simulated by stub-registry, which writes the exact
 #   on-disk layout "otter reference build" produces and then verifies it with the
-#   production reference verifier. It also never executes a workflow: the
-#   Craftmake leg stops at "plan".
+#   production reference verifier. It also never executes a workflow: both the
+#   Craftmake and the build legs stop at "plan".
 #
 # Every stage writes its command, stdout, stderr, and exit code under
 # --artifacts-dir so a failing run can be diagnosed without rerunning it.
@@ -44,6 +49,7 @@ fixture_root="${repository_root}/testdata/gate6/craftmake-downsample-20260906/fa
 craftmake_catalog="${repository_root}/craftmake/workflows"
 scenarios="rrbs,rnaseq,bs-pdx,rna-pdx"
 run_legacy_leg=true
+run_build_leg_flag=true
 keep_work_directory=false
 
 usage() {
@@ -63,6 +69,7 @@ optional:
   --craftmake-catalog PATH craftmake workflow catalog (default: craftmake/workflows)
   --scenarios LIST         comma-separated subset of rrbs,rnaseq,bs-pdx,rna-pdx
   --skip-legacy            skip the legacy compatibility leg
+  --skip-build             skip the otter build comparison leg
   --keep                   keep the work directory (implies printing its path)
   --help                   show this message
 USAGE
@@ -80,6 +87,7 @@ while [[ $# -gt 0 ]]; do
     --craftmake-catalog) craftmake_catalog="${2:?}"; shift 2 ;;
     --scenarios) scenarios="${2:?}"; shift 2 ;;
     --skip-legacy) run_legacy_leg=false; shift ;;
+    --skip-build) run_build_leg_flag=false; shift ;;
     --keep) keep_work_directory=true; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -586,8 +594,198 @@ run_executor_pairing_matrix() {
 }
 
 # ---------------------------------------------------------------------------
-# install plan leg
+# otter build leg
 # ---------------------------------------------------------------------------
+
+# run_build_leg exercises "otter build" against the manual init/create/resolve
+# chain, for every scenario the v1 leg already covers.
+#
+# The comparison is the whole point. "otter build" is a shortcut over three
+# existing commands, so its contract is not "it worked" but "it produced the
+# same project the three commands produce". Each scenario therefore authorises
+# the same inputs twice, once per path, and compares the authoring artifacts
+# byte for byte.
+run_build_leg() {
+  local comparison_failures=0
+
+  for scenario_name in ${scenarios//,/ }; do
+    case "${scenario_name}" in
+      rrbs)   build_scenario "rrbs"    "RRBS"   "hg19" ""     ""     "SRR31480456" ;;
+      rnaseq) build_scenario "rnaseq"  "RNASEQ" "hg38" ""     ""     "SRR018258"   ;;
+      bs-pdx) build_scenario "bs-pdx"  "RRBS"   ""     "hg38" "mm10" "SRR36187610" ;;
+      rna-pdx) build_scenario "rna-pdx" "RNASEQ" ""    "hg38" "mm10" "SRR30880970" ;;
+      *) echo "error: unknown scenario ${scenario_name}" >&2; exit 2 ;;
+    esac || comparison_failures=$((comparison_failures + 1))
+  done
+
+  if [[ "${comparison_failures}" -eq 0 ]]; then
+    passed_stages=$((passed_stages + 1))
+    stage_results+=("build/all-scenarios-match-manual|pass")
+    log_pass "build: every scenario matches the manual chain"
+  else
+    failed_stages=$((failed_stages + 1))
+    stage_results+=("build/all-scenarios-match-manual|fail")
+    log_fail "build: ${comparison_failures} scenario(s) diverged from the manual chain"
+  fi
+}
+
+# build_scenario runs both authoring paths for one scenario and compares them.
+build_scenario() {
+  local scenario_name="$1"
+  local mode="$2"
+  local primary_reference="$3"
+  local graft_reference="$4"
+  local host_reference="$5"
+  local accession="$6"
+
+  CURRENT_SCENARIO="build-${scenario_name}"
+  local scenario_directory="${work_directory}/build-${scenario_name}"
+  local manual_root="${scenario_directory}/manual"
+  local build_root="${scenario_directory}/build"
+
+  # Both paths read the SAME input tree. This is required for the comparison to
+  # mean anything: samples.tsv records each input path relative to its own
+  # project root, so two sibling project roots over one input tree record the
+  # same relative path, while two separate input trees would record different
+  # ones and the manifest would differ for a reason that has nothing to do with
+  # the authoring code. The digests are content-addressed, so sharing the bytes
+  # does not make the two runs indistinguishable either.
+  stage_scenario_fastq "${accession}" "${scenario_directory}"
+
+  log_section "build comparison: ${scenario_name} (${mode})"
+
+  # The shared reference arguments, so the two paths cannot differ by flags.
+  local -a reference_arguments=()
+  if [[ -n "${graft_reference}" ]]; then
+    reference_arguments+=(--reference-graft "$(scenario_reference_selection "${graft_reference}")")
+    reference_arguments+=(--reference-host "$(scenario_reference_selection "${host_reference}")")
+  else
+    reference_arguments+=(--reference-primary "$(scenario_reference_selection "${primary_reference}")")
+  fi
+
+  # --- path 1: the manual chain -------------------------------------------
+  stage_working_directory="${work_directory}"
+  run_stage "manual-init" "${otter_binary}" init "${manual_root}"
+  stage_working_directory="${scenario_directory}"
+  run_stage "manual-create" "${otter_binary}" create \
+    --output "${manual_root}" \
+    --fastq "${scenario_directory}/fastq" \
+    --pdata "${scenario_directory}/pdata.csv" \
+    --mode "${mode}" \
+    --jobid "${scenario_name}" \
+    --reference-root "${OTTER_REFERENCE_ROOT}" \
+    "${reference_arguments[@]}"
+  run_stage "manual-validate" "${otter_binary}" config validate \
+    --config "${manual_root}/project.yaml" --schema v1
+  run_stage "manual-resolve" "${otter_binary}" config resolve \
+    --project "${manual_root}/project.yaml" \
+    --reference-root "${OTTER_REFERENCE_ROOT}" \
+    --backend local
+
+  # --- path 2: otter build -------------------------------------------------
+  run_stage "build" "${otter_binary}" build \
+    --project-root "${build_root}" \
+    --fastq "${scenario_directory}/fastq" \
+    --pdata "${scenario_directory}/pdata.csv" \
+    --mode "${mode}" \
+    --jobid "${scenario_name}" \
+    --reference-root "${OTTER_REFERENCE_ROOT}" \
+    --backend local \
+    "${reference_arguments[@]}"
+
+  # --- comparison ----------------------------------------------------------
+  if compare_authoring_artifacts "${scenario_name}" "${manual_root}" "${build_root}"; then
+    passed_stages=$((passed_stages + 1))
+    stage_results+=("build-${scenario_name}/artifacts-match|pass")
+    log_pass "build-${scenario_name}: authoring artifacts match the manual chain"
+  else
+    failed_stages=$((failed_stages + 1))
+    stage_results+=("build-${scenario_name}/artifacts-match|fail")
+    log_fail "build-${scenario_name}: authoring artifacts differ from the manual chain"
+    return 1
+  fi
+
+  # The executor default is the other half of the contract: the shortcut must
+  # select craftmake without being told, because that is the execution layer
+  # under development.
+  local build_snapshot
+  build_snapshot="$(tail -n 1 "${artifacts_directory}/build-${scenario_name}/build/stdout.txt")"
+  if [[ ! -f "${build_snapshot}" ]]; then
+    failed_stages=$((failed_stages + 1))
+    stage_results+=("build-${scenario_name}/snapshot-written|fail")
+    log_fail "build-${scenario_name}: no readable snapshot at ${build_snapshot}"
+    return 1
+  fi
+  local build_executor build_schema build_immutable
+  build_executor="$(awk '/^execution:/{found=1} found && /value:/{print $2; exit}' "${build_snapshot}")"
+  build_schema="$(extract_field "${build_snapshot}" "schema_version")"
+  build_immutable="$(extract_field "${build_snapshot}" "immutable")"
+  if [[ "${build_executor}" != "craftmake" || "${build_schema}" != "otter.run/v1" || "${build_immutable}" != "true" ]]; then
+    failed_stages=$((failed_stages + 1))
+    stage_results+=("build-${scenario_name}/snapshot-contract|fail")
+    log_fail "build-${scenario_name}: snapshot contract mismatch (schema=${build_schema} immutable=${build_immutable} executor=${build_executor})"
+    return 1
+  fi
+  passed_stages=$((passed_stages + 1))
+  stage_results+=("build-${scenario_name}/snapshot-contract|pass")
+  log_pass "build-${scenario_name}: snapshot is immutable otter.run/v1 selecting craftmake"
+
+  # The snapshot must be usable by the executor boundary, not merely present.
+  run_stage "build-run-dry-run" "${otter_binary}" run \
+    --config "${build_snapshot}" \
+    --executor craftmake \
+    --phase step1 \
+    --dry-run \
+    --foreground \
+    --craftmake-binary "${craftmake_binary}" \
+    --catalog "${craftmake_catalog}"
+
+  if grep -q '"command": *"plan"' "${artifacts_directory}/build-${scenario_name}/build-run-dry-run/stdout.txt" \
+    && grep -q '"ok": *true' "${artifacts_directory}/build-${scenario_name}/build-run-dry-run/stdout.txt"; then
+    passed_stages=$((passed_stages + 1))
+    stage_results+=("build-${scenario_name}/craftmake-plan-envelope|pass")
+    log_pass "build-${scenario_name}: craftmake plan envelope received"
+  else
+    failed_stages=$((failed_stages + 1))
+    stage_results+=("build-${scenario_name}/craftmake-plan-envelope|fail")
+    log_fail "build-${scenario_name}: no successful craftmake plan envelope on stdout"
+    return 1
+  fi
+
+  return 0
+}
+
+# compare_authoring_artifacts asserts the two authoring paths agree.
+#
+# Only the authoring artifacts are compared. The snapshots are not, because a
+# snapshot embeds its own run directory and creation timestamp; the comparison
+# that matters is the project intent, the samples, and the locked reference
+# digest, which must be identical or the two paths disagree about what a
+# project is.
+compare_authoring_artifacts() {
+  local scenario_name="$1"
+  local manual_root="$2"
+  local build_root="$3"
+  local identical=0
+
+  for artifact in project.yaml samples.tsv references.lock.yaml; do
+    if [[ ! -f "${manual_root}/${artifact}" ]]; then
+      log_fail "build-${scenario_name}: manual chain did not write ${artifact}"
+      return 1
+    fi
+    if [[ ! -f "${build_root}/${artifact}" ]]; then
+      log_fail "build-${scenario_name}: otter build did not write ${artifact}"
+      return 1
+    fi
+    if ! diff -q "${manual_root}/${artifact}" "${build_root}/${artifact}" > /dev/null; then
+      log_fail "build-${scenario_name}: ${artifact} differs from the manual chain"
+      diff "${manual_root}/${artifact}" "${build_root}/${artifact}" | sed -n '1,10p' >&2 || true
+      identical=1
+    fi
+  done
+
+  [[ "${identical}" -eq 0 ]]
+}
 
 run_install_leg() {
   CURRENT_SCENARIO="install"
@@ -832,6 +1030,13 @@ run_site_profile_leg
 
 if [[ "${run_legacy_leg}" == true ]]; then
   run_legacy_leg || true
+fi
+
+# The build leg runs after the scenarios so it reuses the registry they built,
+# and before the relative-input leg because it is an authoring contract rather
+# than a convention check.
+if [[ "${run_build_leg_flag}" == true ]]; then
+  run_build_leg || true
 fi
 
 # The relative-input leg runs last because it is an authoring convention check,
