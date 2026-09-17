@@ -115,6 +115,20 @@ conda activate go-env
 go build -o otter .
 ```
 
+### Or try it in Colab
+
+No local setup, no download of your own: this notebook installs the published release with the
+real `otter-install`, builds a simulated reference registry, authors every scenario from the
+repository's own downsampled FASTQ fixtures, and resolves each run with `--dry-run` so you can
+watch the task graph compile. It executes no tool and produces no scientific result.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/otter-colab-walkthrough.ipynb)
+
+The notebook lives at [`notebooks/otter-colab-walkthrough.ipynb`](notebooks/otter-colab-walkthrough.ipynb).
+It takes about fifteen minutes, most of which is `enva` creating `otter-core` and
+`otter-snakemake`; set `SKIP_ENVS = True` for a faster pass that exercises authoring and planning
+only.
+
 ### Create and run a project
 
 `otter init` and `otter create` default to the canonical v1 track, which is what `otter run` consumes.

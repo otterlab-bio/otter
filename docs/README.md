@@ -39,6 +39,10 @@ The manual is the task-oriented sequence. Read it in order for a first run, or j
 - [Worked examples](examples/) — a complete canonical project, reference release, lock file, run snapshot, and samples manifest.
 - [Schemas](schema/) — the JSON Schemas for project configuration, run snapshots, references, locks, and artifact manifests.
 
+## Interactive walkthroughs
+
+- [OTTER on Google Colab](../notebooks/otter-colab-walkthrough.ipynb) — installs the published release with the real `otter-install`, writes a simulated reference registry, authors every scenario from the repository's own fixtures, and resolves each run with `--dry-run`. Offline after the install, and it executes no tool.
+
 ## Contracts outside this directory
 
 These are authoritative for their own subject and are not duplicated here:
