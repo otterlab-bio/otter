@@ -16,7 +16,7 @@ A source-built binary may still report compatibility-era `xdxtools` symbols. Che
 Verify the canonical repository and authenticate when assets are private:
 
 ```text
-https://github.com/rainoffallingstar/otter
+https://github.com/otterlab-bio/otter
 ```
 
 Use `GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_PAT` only through the installer's supported environment interface. Never commit tokens or put them in URLs.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/rainoffallingstar/otter/docs/schema/otter-run-v1.schema.json",
+  "$id": "https://github.com/otterlab-bio/otter/docs/schema/otter-run-v1.schema.json",
   "title": "Otter immutable run snapshot v1",
   "type": "object",
   "additionalProperties": false,
