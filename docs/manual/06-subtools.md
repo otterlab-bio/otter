@@ -26,9 +26,10 @@ enva run otter-core -- <command>
 enva validate --all
 ```
 
-Rust Bismark is installed separately into `$HOME/.cargo/bin` from the official
-`FelixKrueger/Bismark` release `bismark-rust-v3.1.0`. The maintained
-methylation rules invoke those user-global commands directly.
+Bismark 3.1.0 (Rust suite) and Bowtie2 2.5.5 are provided by the `otter-core`
+environment; the installer verifies the pinned versions after environment
+creation. The maintained methylation rules invoke them through
+`enva run otter-core -- ...` rather than any user-global installation.
 
 External conda/mamba/micromamba environments require explicit compatibility handling or adoption.
 

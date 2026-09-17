@@ -81,9 +81,9 @@ var runCmd = &cobra.Command{
 	Long: `Execute a bioinformatics workflow with the specified configuration.
 
 Examples:
-  otter run --config otter.yaml
-  otter run --config otter.yaml --engine slurm
-  otter run --config otter.yaml --dry-run`,
+  otter run --config /analysis/project/runs/<run-id>/run.yaml --phase step1
+  otter run --config /analysis/project/runs/<run-id>/run.yaml --phase step1 --dry-run --foreground
+  otter run --config /analysis/project/runs/<run-id>/run.yaml --phase step1 --resume`,
 	RunE: runRun,
 }
 

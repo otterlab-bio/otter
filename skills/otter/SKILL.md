@@ -1,6 +1,6 @@
 ---
 name: otter
-description: "Use when working in the otter bioinformatics workflow repositories: the root CLI or its independent submodules craftmake, enva, fastqcx, xenofilx, pairbam, seq2mat, matsrun, qctb, methx, and bamdriver. Covers repository boundaries, toolchain selection, documentation maintenance, CLI-contract verification, and evidence-aware release language."
+description: "Operates, troubleshoots, develops, validates, and documents the otter bioinformatics workflow stack: the root CLI and independent craftmake, enva, fastqcx, xenofilx, pairbam, seq2mat, matsrun, qctb, methx, and bamdriver repositories. Use when creating or migrating projects, resolving immutable runs, running Local/SLURM workflows, diagnosing operator failures, changing repository contracts, testing releases, or maintaining user documentation."
 ---
 
 # otter repository skill
@@ -14,6 +14,8 @@ Use this skill for code, documentation, release, and validation work in the `ott
 3. Read the owning README, CLI entrypoint, package manifest, and relevant tests before changing a user-facing contract.
 4. Keep current product names and external scientific standards distinct. See [repo-map.md](references/repo-map.md) for historical aliases.
 5. For documentation work, read [documentation.md](references/documentation.md) before restructuring an entrypoint.
+6. For an operational request, load [operations.md](references/operations.md). For a
+   focused subtool, load [operator-contracts.md](references/operator-contracts.md).
 
 ## Product model
 
@@ -27,21 +29,62 @@ otter → craftmake → enva → operators → bamdriver
 - `fastqcx`, `xenofilx`, `pairbam`, `seq2mat`, `matsrun`, `qctb`, and `methx` are focused operator CLIs.
 - `bamdriver` owns shared BAM/BGZF primitives used by BAM-consuming operators.
 
-## Authoring flow and the two tracks
+## Route the task before acting
+
+| Request | Owning surface | First evidence |
+| --- | --- | --- |
+| Install or verify the stack | root `installer/` + `enva` | `otter-install -dry-run`, `enva validate --all` |
+| Create/resolve/run a project | root `otter` | [operations.md](references/operations.md) |
+| Compile, execute, resume, or inspect a DAG | `craftmake` | `skills/craftmake/SKILL.md` |
+| Build or select a genome release | root `reference` commands / Craftmake ReferenceBuild | registry manifest + checksums |
+| FASTQ/BAM/matrix/QC/methylation processing | owning operator | [operator-contracts.md](references/operator-contracts.md) |
+| Existing `config/otter.yaml` | root migration adapter | validate → migrate → resolve; never execute it |
+| Cross-repo release claim | all affected owners | real binary help, tests, e2e, and artifact verifier |
+
+Do not start by editing the umbrella repo when a focused operator owns the
+behavior. Do not make an operator responsible for orchestration that belongs to
+Otter or Craftmake.
+
+## Known-good operational path
+
+For a user request that does not require source changes:
+
+1. Verify `otter`, `enva`, and `craftmake`; verify Bismark/Bowtie2 through
+   `enva run otter-core -- ...`.
+2. Confirm FASTQ suffixes, pdata sample IDs, scenario, and reference roles.
+3. `otter init`, `otter create`, `otter config validate`, then
+   `otter config resolve` — or use `otter build`.
+4. Plan **every published phase** with `--dry-run`; planning only `step1` is not
+   evidence that downstream phases resolve.
+5. Execute the immutable snapshot, monitor through `otter task`, and verify
+   published artifacts.
+6. When anything changes in project intent, references, inputs, executor,
+   backend, or resources, resolve a new run instead of overriding the old one.
+
+The exact commands and failure routing are in
+[operations.md](references/operations.md).
+
+## Authoring flow and legacy support
 
 ```text
 otter init → otter create → otter config resolve → otter run
 ```
 
-Both tracks author through the same commands, and the track is chosen by a flag
-that must be consistent:
+There is one authoring track: `otter init` and `otter create` produce a
+**canonical v1** project (`project.lock.yaml`, `project.yaml`, `samples.tsv`,
+`references.lock.yaml`). The legacy authoring track and its `--legacy` flag have
+been removed; do not document them.
 
-- Default: `otter init` and `otter create` produce a **canonical v1** project
-  (`project.lock.yaml`, `project.yaml`, `samples.tsv`, `references.lock.yaml`).
-- `--legacy` on **both** commands produces the **legacy compatibility** project
-  (`config/otter.yaml` plus `.otter/assets.manifest.json`). Only when both pass
-  `--legacy` is that loop promised; mixed use is refused with guidance.
-- A project carrying both markers is an error rather than a silent preference.
+Legacy support is now detection plus migration only:
+
+- A pre-existing legacy project (created by an earlier release) is recognised by
+  its `.otter/assets.manifest.json` marker. `init`, `create`, and `build` refuse
+  such a directory and route it at `otter config migrate`.
+- `otter config migrate` converts a legacy `config/otter.yaml` into canonical
+  project intent; `otter config validate --schema legacy` (or `auto`) is the
+  pre-migration sanity check; `otter assets verify` still checks an old
+  checkout's pinned assets.
+- A directory carrying both markers is an error rather than a silent preference.
 
 `otter build` chains the canonical steps — init, create, validate, resolve — and
 stops before execution, printing the snapshot path. It is a shortcut over the
@@ -68,8 +111,9 @@ The rules live under `workflows/` rather than at the project root because a
 Snakefile's `include:` directives resolve relative to **the Snakefile's own
 directory**, not the working directory. Keeping the rules beside the Snakefiles
 is what lets a canonical project run with nothing written into the project root.
-The legacy track still puts its Snakefiles at the project root, which is why the
-executor's search order checks the current directory before `workflows/`.
+Pre-existing legacy projects keep their Snakefiles at the project root, which is
+why the executor's search order checks the current directory before
+`workflows/`.
 
 ### What is fixed, and when
 
@@ -77,9 +121,9 @@ Four rules explain most of the "why was this refused" questions. Docs that viola
 them look plausible and fail on first use, so check a change against all four:
 
 1. **The snapshot is the only thing an executor consumes.** A raw legacy
-   `config/otter.yaml` is refused by *both* executors with migration guidance. The
-   legacy track is therefore authoring-only: to run it, `otter init` a canonical
-   root, `otter config migrate` into it, `config resolve`, then run. Never document
+   `config/otter.yaml` is refused by *both* executors with migration guidance. To
+   run a pre-existing legacy project, `otter init` a canonical root,
+   `otter config migrate` into it, `config resolve`, then run. Never document
    `otter run --config .../config/otter.yaml`.
 2. **The backend and the resource envelope are fixed at resolve time.** They come
    from `project.yaml`'s `resources:` merged with the selected site profile
@@ -91,12 +135,13 @@ them look plausible and fail on first use, so check a change against all four:
 3. **Editing `project.yaml` invalidates existing runs.** The snapshot pins the
    project digest, so a later `otter run` reports `run snapshot drift detected` and
    refuses. Resolve a new run after any intent change.
-4. **Legacy-only flags are silently ignored on the canonical track.** `--species1`,
-   `--genome1-*`/`--genome2-*`, `--gtf1`/`--gtf2`, and `--star-index1`/`-2` affect
-   only `--legacy`. `--species2` merely *signals* PDX intent; the references
-   themselves must come from `--reference-graft`/`--reference-host`, and the host
-   and graft species come from the releases' own organism metadata. A canonical
-   `create` that names no reference role fails with
+4. **PDX selection comes solely from the reference roles.** Naming both
+   `--reference-graft` and `--reference-host` is what selects a PDX scenario,
+   and the host and graft species come from the releases' own organism metadata.
+   The legacy-only flags (`--legacy`, `--species1`/`--species2`,
+   `--genome1-*`/`--genome2-*`, `--gtf1`/`--gtf2`, `--star-index1`/`-2`,
+   `--conda-env`) no longer exist and are rejected as unknown flags. A `create`
+   that names no reference role fails with
    `scenario "rrbs" requires --reference-primary as id@release`.
 
 Use one example reference identity across the docs. The established pair is
@@ -137,6 +182,26 @@ The runtime is dual-track. Existing production workflows use Snakemake
 compatibility assets; Craftmake integration is still being validated. Do not
 write documentation that implies complete Snakemake replacement unless the source
 and accepted evidence explicitly support that claim.
+
+## Troubleshooting protocol
+
+Classify before changing code:
+
+1. **Authoring failure** — inspect FASTQ pairing, pdata aliases, reference roles,
+   registry verification, and project markers.
+2. **Resolution failure** — inspect schema, site profile, workflow asset digest,
+   absolute paths, reference manifest, and resource units.
+3. **Planning failure** — identify the workflow/phase/catalog entry; compare the
+   snapshot's selected executor with the requested executor.
+4. **Execution failure** — read the task's `stderr.log`; controller summaries
+   intentionally do not contain every tool diagnostic.
+5. **Publication failure** — inspect declarations, artifact manifest, checksums,
+   and transactional staging; never synthesize a success marker.
+6. **Scientific parity failure** — separate orchestration success from
+   comparator acceptance. A completed task graph is not scientific validation.
+
+For Craftmake-specific diagnosis, use the troubleshooting section in
+`skills/craftmake/SKILL.md`.
 
 ## Toolchain selection
 
@@ -187,6 +252,16 @@ Use the smallest relevant validation first:
 4. Rust: `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features --locked -- -D warnings`, and `cargo test --all-targets --all-features --locked` when the repository workflow uses them.
 5. Run the linter on edited files after substantive changes.
 
+Operational work is accepted only when the documented command reaches the
+requested boundary:
+
+- authoring: expected `project.yaml`, `samples.tsv`, and
+  `references.lock.yaml`;
+- resolution: immutable `runs/<run-id>/run.yaml`;
+- planning: non-empty tasks for every published phase;
+- execution: state and logs tied to the phase-scoped run identity;
+- publication: production verifier accepts the artifact manifest/checksums.
+
 ### Verify documented flags against the binary, not against memory
 
 Documented flags drift silently, and a skill or tutorial that names a flag the
@@ -224,13 +299,17 @@ go build -o /tmp/otter . && (cd craftmake && go build -o /tmp/craftmake ./cmd/cr
 bash scripts/e2e/otter_e2e.sh --otter /tmp/otter --craftmake /tmp/craftmake
 ```
 
-It is offline: it never downloads a genome and never runs an index builder. Three
+It is offline: it never downloads a genome and never runs an index builder. Two
 legs are optional, so a stage count below the documented total is not itself a
 failure:
 
 - the `otter-install` leg runs only with `--installer <path>`;
-- the legacy compatibility leg runs by default and is skipped with `--skip-legacy`;
 - the `otter build` leg runs by default and is skipped with `--skip-build`.
+
+The legacy *migration* leg always runs: it starts from a fixture
+`config/otter.yaml` written by the script (legacy authoring is gone) and drives
+validate → migrate → resolve → snakemake dry-run plus the executor pairing
+matrix.
 
 The build leg is a comparison, not a smoke test. It authors each scenario twice —
 once through the manual chain, once through `otter build` — and fails if

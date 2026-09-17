@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/otterlab-bio/otter/internal/logger"
 )
@@ -34,13 +33,11 @@ func GetSystemInfo() (*SystemInfo, error) {
 	totalMemBytes, err := readTotalMemory()
 	if err != nil {
 		logger.Warnf("Failed to read memory from /proc/meminfo: %v", err)
-		// Use syscall fallback
-		var sysInfo syscall.Sysinfo_t
-		if err2 := syscall.Sysinfo(&sysInfo); err2 != nil {
+		// Use the platform-specific fallback
+		totalMemBytes, err = totalMemoryFallback()
+		if err != nil {
 			return nil, fmt.Errorf("failed to get system memory info: %w", err)
 		}
-		// Assume 4096-byte pages (most Linux systems)
-		totalMemBytes = int64(sysInfo.Totalram) * 4096
 	}
 
 	info.TotalMem = totalMemBytes / (1024 * 1024) // convert to MB

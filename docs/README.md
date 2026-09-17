@@ -20,6 +20,7 @@ repository's source before it is published.
 | Migrate a legacy project to canonical v1 | [Reference migration](manual/08-reference-migration.md) |
 | Look up a bundled operator or CLI | [Subtools](manual/06-subtools.md) |
 | Troubleshoot a failure | [FAQ](manual/07-faq.md) |
+| Look up the complete `otter` command tree | [CLI reference](manual/09-cli-reference.md) |
 
 ## The manual
 
@@ -33,6 +34,7 @@ The manual is the task-oriented sequence. Read it in order for a first run, or j
 6. [Subtools](manual/06-subtools.md) — the bundled operators and when each one runs.
 7. [FAQ](manual/07-faq.md) — common failures and what they mean.
 8. [Reference migration](manual/08-reference-migration.md) — the legacy archive and the registry contract.
+9. [CLI reference](manual/09-cli-reference.md) — project, site, reference, artifact, acquisition, and benchmark commands.
 
 ## Reference material in this directory
 
@@ -42,7 +44,7 @@ The manual is the task-oriented sequence. Read it in order for a first run, or j
 ## Interactive walkthroughs
 
 - [OTTER on Google Colab](../notebooks/otter-colab-walkthrough.ipynb) — installs the published release with the real `otter-install`, writes a simulated reference registry, authors every scenario from the repository's own fixtures, and resolves every phase of each run with `--dry-run`. Offline after the install, and it executes no tool.
-- [OTTER on Google Colab (简体中文)](../notebooks/otter-colab-walkthrough-zh.ipynb) — the same walkthrough with Chinese prose. Identical cells and identical execution.
+- [OTTER on Google Colab (简体中文)](../notebooks/otter-colab-walkthrough-zh.ipynb) — the same walkthrough with Chinese prose. The execution logic is identical; only the explanatory text differs in language.
 
   Open either directly in Colab:
 
@@ -57,8 +59,6 @@ The manual is the task-oriented sequence. Read it in order for a first run, or j
 
 These are authoritative for their own subject and are not duplicated here:
 
-- [Repository guidelines](../AGENTS.md) — CI conventions, module organization, and the validation commands CI runs.
-- [Project instructions](../CLAUDE.md) — product hierarchy, the naming contract, and the dual-track runtime state.
 - [Offline e2e rehearsal](../scripts/e2e/otter_e2e.sh) — the authoring, build, site-profile, pairing, and migration contracts, asserted against the real binaries without network access.
 - [Otter repository skill](../skills/otter/SKILL.md) — repository boundaries, toolchain matrix, validation strategy, and safe operating rules.
 - [Craftmake workflow skill](../skills/craftmake/SKILL.md) — controller usage, YAML workflow authoring, and compatibility boundaries.

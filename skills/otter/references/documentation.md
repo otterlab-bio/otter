@@ -94,12 +94,12 @@ Watch for near-miss flag pairs, which are the ones that survive review:
 | `--state-dir` / `--state` | `run`, `plan`, `validate` take `--state-dir`; `status`, `logs`, `report`, `resume`, `cancel` take `--state <state.sqlite>` + `--run` |
 | `--workers` / `--max-parallel` | Separate flags; `--workers` wins and `--max-parallel` is the zero-value fallback |
 
-A documented stage count can also drift, and three legs of
+A documented stage count can also drift, and two legs of
 `scripts/e2e/otter_e2e.sh` are conditional: `otter-install` runs only with
-`--installer`, while the legacy and `otter build` legs run by default and are
-dropped with `--skip-legacy` and `--skip-build`. State which flags produced a
-count whenever you record one, and verify the count against a real run rather than
-adjusting the number to match the last document.
+`--installer`, while the `otter build` leg runs by default and is dropped with
+`--skip-build`. State which flags produced a count whenever you record one, and
+verify the count against a real run rather than adjusting the number to match
+the last document.
 
 ## Remote host documentation
 

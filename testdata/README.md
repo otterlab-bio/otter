@@ -1,6 +1,6 @@
-# xdxtools Test Data Directory
+# otter test data directory
 
-This directory contains all test data, configurations, and sample projects for testing the xdxtools Go package.
+This directory contains all test data, configurations, and sample projects for testing the otter Go package. (Some fixture contents retain compatibility-era `xdxtools` symbols where tests assert on them.)
 
 ## Directory Structure
 
@@ -72,12 +72,12 @@ xdxtools create \
     --mode RRBS \
     --output testdata/projects
 
-# Test PDX mode
+# Test PDX mode (selected by naming both reference roles)
 xdxtools create \
     --fastq testdata/fastq/test_fastq \
     --mode RRBS \
-    --species1 human \
-    --species2 mouse \
+    --reference-graft hg38@GRCh38.p14 \
+    --reference-host mm10@GRCm38.p6 \
     --output testdata/projects
 ```
 

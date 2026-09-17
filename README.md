@@ -35,7 +35,7 @@ rehearsal runs offline.
 
 ```text
 $ bash scripts/e2e/otter_e2e.sh --otter ./otter --craftmake ./craftmake
-  stages passed: 101
+  stages passed: 99
   stages failed: 0
 ```
 
@@ -92,7 +92,9 @@ while `craftmake`, the native Go execution layer, is integrated and validated al
 ### Install a release
 
 The release installer is a statically compiled Go binary published alongside the umbrella's
-own releases:
+own releases. This example targets Linux amd64; use a matching published asset
+for another Linux architecture. macOS source builds are supported, but the
+umbrella installer asset shown here is Linux-only:
 
 ```bash
 curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static
@@ -132,7 +134,8 @@ https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/
 ```
 
 A [Chinese-language version](notebooks/otter-colab-walkthrough-zh.ipynb) covers the same ground
-with identical cells, so either can be read alongside the other.
+with the same execution logic — only the explanatory text differs in language — so either can be
+read alongside the other.
 
 The notebooks live in [`notebooks/`](notebooks/).
 They take about fifteen minutes, most of which is `enva` creating `otter-core` and
@@ -211,30 +214,17 @@ otter task status <task-id>
 otter task logs <task-id> --follow
 ```
 
-### Create and run a legacy-compatible project (compatibility track)
+### Migrate an existing legacy project
 
-The Snakemake compatibility track requires `--legacy` on **both** authoring commands:
-
-```bash
-otter init my_project --legacy
-
-otter create \
-  --legacy \
-  --fastq /data/fastq \
-  --mode RRBS \
-  --pdata /data/samples.xlsx \
-  --output my_project/userspace \
-  --jobid demo_rrbs
-```
-
-Legacy `otter.yaml` is an authoring format that **neither executor accepts
-directly**. To run it, migrate it into a canonical project root, resolve a run,
-and execute that snapshot:
+Otter no longer authors legacy projects, but projects created by earlier
+releases still carry a `config/otter.yaml`. That file is **not accepted by any
+executor directly**. To run one, migrate it into a canonical project root,
+resolve a run, and execute that snapshot:
 
 ```bash
 otter init migrated
 otter config migrate \
-  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --input old_project/userspace/demo_rrbs/config/otter.yaml \
   --output migrated/project.yaml \
   --reference-root /shared/otter/references \
   --reference-primary hg19@GRCh37.p13-gencode-v19

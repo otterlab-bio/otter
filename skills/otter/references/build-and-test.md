@@ -36,12 +36,12 @@ layout and verifier, downloads no genome, and runs no index builder. Each stage
 records its command, stdout, stderr, and exit code under `--artifacts-dir`.
 
 Expected totals depend on which optional legs run, so always record the flags
-alongside the count. With every leg enabled the rehearsal reports **103 stages,
-0 failures**; without `--installer` it reports **101**. Do not treat a lower count
+alongside the count. With every leg enabled the rehearsal reports **101 stages,
+0 failures**; without `--installer` it reports **99**. Do not treat a lower count
 as a regression without checking the flags first.
 
-Useful flags: `--scenarios rrbs,rnaseq,bs-pdx,rna-pdx`, `--skip-legacy`,
-`--skip-build`, `--keep` (preserve the work directory for inspection).
+Useful flags: `--scenarios rrbs,rnaseq,bs-pdx,rna-pdx`, `--skip-build`,
+`--keep` (preserve the work directory for inspection).
 
 ### `otter-install` (`installer/`) — separate Go module
 

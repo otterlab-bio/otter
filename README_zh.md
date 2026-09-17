@@ -58,7 +58,9 @@ otter → craftmake → enva → 算子 → bamdriver
 ### 安装 release
 
 发布安装器是发布到
-[`otterlab-bio/otter`](https://github.com/otterlab-bio/otter) 的静态编译 Go 二进制：
+[`otterlab-bio/otter`](https://github.com/otterlab-bio/otter) 的静态编译 Go 二进制。
+下例使用 Linux amd64 资产；其他 Linux 架构请选择匹配的 release 资产。macOS
+支持从源码构建，但这里展示的 umbrella installer 是 Linux 资产：
 
 ```bash
 curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static
@@ -105,25 +107,14 @@ https://colab.research.google.com/github/otterlab-bio/otter/blob/main/notebooks/
 
 关于为什么 notebook 里是「模拟」参考基因组而不是直接下载：一个真实 release 是数十 GB 级别（单是 GRCh38 的 STAR 索引就约 30 GB），而免费 Colab 运行时只有约 100 GB 临时磁盘。notebook 内说明了在自己的环境里如何用 `otter-install -reference-fetch`、`otter reference build` 或直接下载来获取真实参考基因组。
 
-### 创建并运行兼容路径项目
+### 迁移已有的 legacy 项目
 
-```bash
-otter init my_project --legacy
-
-otter create --legacy \
-  --fastq /data/fastq \
-  --mode RRBS \
-  --pdata /data/samples.xlsx \
-  --output my_project/userspace \
-  --jobid demo_rrbs
-```
-
-legacy 的 `otter.yaml` 只是 authoring 格式，**两个执行层都不直接接受**。要运行它，先迁移到规范项目根目录、解析 run，然后执行该 snapshot：
+Otter 已不再创建 legacy 项目，但早期版本创建的项目仍带有 `config/otter.yaml`。该文件**两个执行层都不直接接受**。要运行它，先迁移到规范项目根目录、解析 run，然后执行该 snapshot：
 
 ```bash
 otter init migrated
 otter config migrate \
-  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --input old_project/userspace/demo_rrbs/config/otter.yaml \
   --output migrated/project.yaml \
   --reference-root /shared/otter/references \
   --reference-primary hg19@GRCh37.p13-gencode-v19

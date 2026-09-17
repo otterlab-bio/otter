@@ -16,6 +16,7 @@ This manual is organized around the first successful run rather than the interna
 | Understand the companion tools | [6. Component reference](06-subtools.md) |
 | Diagnose common failures | [7. FAQ](07-faq.md) |
 | Migrate legacy reference genomes | [8. Reference migration](08-reference-migration.md) |
+| Look up every public command family | [9. CLI reference](09-cli-reference.md) |
 
 ## The current execution model
 
@@ -67,22 +68,15 @@ otter build \
 It defaults to the `craftmake` executor; `--executor snakemake` records the
 Snakemake compatibility executor in the snapshot instead.
 
-The legacy compatibility track requires `--legacy` on **both** authoring commands:
-
-```bash
-otter init my_project --legacy
-otter create --legacy --fastq ./fastq --pdata ./samples.csv \
-  --mode RRBS --output my_project/userspace --jobid demo_rrbs
-```
-
-Legacy `otter.yaml` is an authoring format that no executor accepts directly, so
-this track is authoring-only as written. To run it, migrate into a canonical root
-and execute the resulting snapshot:
+Legacy authoring has been removed. A pre-existing legacy project (created by an
+earlier release, with `config/otter.yaml` under `userspace/<jobid>/`) is not
+accepted by any executor directly. To run it, migrate into a canonical root and
+execute the resulting snapshot:
 
 ```bash
 otter init migrated
 otter config migrate \
-  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --input old_project/userspace/demo_rrbs/config/otter.yaml \
   --output migrated/project.yaml \
   --reference-root "$OTTER_REFERENCE_ROOT" \
   --reference-primary hg19@GRCh37.p13-gencode-v19

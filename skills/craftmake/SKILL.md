@@ -1,6 +1,6 @@
 ---
 name: craftmake
-description: Use when authoring, validating, planning, running, recovering, or documenting Craftmake YAML workflows in the Otter ecosystem.
+description: "Authors, validates, plans, executes, recovers, troubleshoots, and documents Craftmake YAML workflows in the Otter ecosystem. Use when working with immutable run snapshots, Local or SLURM backends, DAG compilation, state.sqlite, phase-scoped run identities, resume/cancel/report operations, ReferenceBuild, workflow expressions, or artifact publication."
 ---
 
 # Craftmake workflow skill
@@ -47,6 +47,26 @@ precedence, and `--max-parallel` is the fallback default when `--workers` is
 zero. The two flag families are not interchangeable: `run`, `plan`, and
 `validate` take `--state-dir`, while the addressing commands (`status`, `logs`,
 `report`, `resume`, `cancel`) take `--state <state.sqlite>` plus `--run`.
+
+### Command and output matrix
+
+| Command | Contract | Important options |
+| --- | --- | --- |
+| `doctor` | Check Local/SLURM runtime dependencies before submission | `--backend local|slurm` |
+| `validate` | Load adapter + compile workflow; write no run state | `--config`, `--workflow`, `--phase`, `--catalog`, `--state-dir`, `--format text|json|jsonl` |
+| `plan` | Return the compiled task DAG; execute nothing | same source flags as `validate`; `--format json` is the safest machine contract |
+| `run` | Execute a phase and persist controller/task state | `--gate`, `--workers`, `--max-parallel`, `--dry-run`, `--force`, SLURM retry/pending options |
+| `status` | Read one persisted run identity | `--state`, `--run`, `--verbose`, `--format` |
+| `logs` | List controller/task log paths | `--state`, `--run`, `--failed`, `--format` |
+| `report` | Export timing/resource metrics | `--state`, `--run`, `--output`, `--format` |
+| `resume` | Recover a failed/cancelled phase from persisted state | `--state`, `--run`, `--gate` |
+| `cancel` | Cancel/reconcile a running phase | `--state`, `--run` |
+| `completion` | Generate shell completion | shell name accepted by Cobra |
+
+For SLURM runs, the controller exposes
+`--slurm-submit-attempts`, `--slurm-submit-backoff`,
+`--slurm-submit-max-backoff`, and `--slurm-pending-timeout`. These control
+submission/reconciliation policy; they do not change task resources.
 
 For artifact verification, use the Otter command against the resolved run:
 
@@ -116,21 +136,22 @@ Craftmake can download, build, and publish an immutable reference genome release
 ```bash
 craftmake plan \
   --reference-build-config \
-  --config reference-build.yaml \
+  --config configs/reference-build.yaml \
   --workflow workflows/ReferenceBuild/build.yaml \
   --phase build \
   --catalog workflows/
 
 craftmake run \
   --reference-build-config \
-  --config reference-build.yaml \
+  --config configs/reference-build.yaml \
   --workflow workflows/ReferenceBuild/build.yaml \
   --phase build \
   --catalog workflows/ \
   --gate
 ```
 
-The reference-build backend and partition are configurable in `reference-build.yaml`:
+The reference-build backend and partition are configurable in
+`configs/reference-build.yaml` in a source checkout:
 
 ```yaml
 reference_build:
@@ -140,6 +161,38 @@ reference_build:
 ```
 
 A default `reference-build.yaml` template ships in the release archive under `share/craftmake/configs/`. Pass `--gate` here for the same reason as any other run: it fixes the phase-scoped run identity and rejects resource overrides the configuration already settled.
+
+## Failure diagnosis
+
+Follow this order; do not retry blindly:
+
+1. Run `craftmake doctor --backend <backend>`.
+2. Run `validate`, then `plan --format json`; confirm `ok: true`, the selected
+   workflow/phase, and a non-empty task list.
+3. Read the controller log path printed by `run`; use `status --verbose`.
+4. Use `logs --failed` and open the failing attempt's
+   `steps/*/stderr.log`. A generic `tool_invocation` incident is routing
+   metadata, not the underlying tool message.
+5. For a missing environment, preserve the real `HOME` or set
+   `ENVA_RATTLER_ROOT_PREFIX`; do not copy binaries into the task directory.
+6. For SLURM, distinguish `sbatch` submission, pending timeout, step creation,
+   worker exit, accounting delay, and artifact validation. They have different
+   retry safety.
+7. Use `resume --gate` only for the same immutable snapshot and phase-scoped
+   run identity. Resolve a new run when inputs/resources/references changed.
+
+### Shell portability
+
+Workflow `steps[].run` blocks may execute in test/local environments as well as
+Linux compute nodes. Keep them compatible with the declared `shell`:
+
+- invoke Python as `python3`, not an ambiguous `python`;
+- avoid Bash 4-only `${value,,}` and `mapfile` unless the environment contract
+  explicitly pins Bash 4+;
+- avoid GNU-only `stat -c` and `find -printf`; use a tested GNU/BSD fallback or
+  portable relative-path construction;
+- `/usr/bin/time` must be capability-probed before using GNU-only `-v -o`;
+- validate workflow YAML after editing embedded shell indentation.
 
 ## YAML workflow structure
 
@@ -230,7 +283,7 @@ Snakemake assets are retained as explicit compatibility archives. A `legacy-equi
 | `name`, `version`, `on.otter` | Supported | Not a Snakemake-native contract | No |
 | `defaults`, `jobs`, `inputs`, `outputs`, `resources`, `steps` | Supported | Translated through the adapter where applicable | No |
 | `${{ config.* }}`, `${{ inputs.* }}`, `${{ outputs.* }}` | Supported | Fixture/adapter compatibility | No |
-| Immutable `otter.run/v1` snapshot | Required for canonical runs | Not required for legacy projects | No |
+| Immutable `otter.run/v1` snapshot | Required | Required by Otter's Snakemake compatibility executor | No |
 | Local backend | Supported | Supported through explicit executor selection | No |
 | SLURM backend and controller reconciliation | Supported | Explicit compatibility path | No |
 | `legacy-equivalent` tool comparison | Not part of formal execution | Historical comparison path | Yes |

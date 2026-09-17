@@ -50,6 +50,15 @@ func TestDiscoverProjectDirFromConfigFallsBackToConfigDir(t *testing.T) {
 	}
 }
 
+func TestRunHelpUsesImmutableSnapshotExamples(t *testing.T) {
+	if strings.Contains(runCmd.Long, "otter run --config otter.yaml") {
+		t.Fatalf("run help still advertises a raw otter.yaml:\n%s", runCmd.Long)
+	}
+	if !strings.Contains(runCmd.Long, "runs/<run-id>/run.yaml") {
+		t.Fatalf("run help does not demonstrate an immutable snapshot:\n%s", runCmd.Long)
+	}
+}
+
 func TestResolveRunPathsWithExplicitProjectDir(t *testing.T) {
 	configDir := filepath.Join(t.TempDir(), "config")
 	configPath := filepath.Join(configDir, "config.yaml")
@@ -160,7 +169,7 @@ func TestValidateCreateOutputDir(t *testing.T) {
 		path    string
 		wantErr bool
 	}{
-		{name: "directory path", path: "my_project/userspace", wantErr: false},
+		{name: "directory path", path: "my_project/data", wantErr: false},
 		{name: "yaml path", path: "config/config.yaml", wantErr: true},
 		{name: "json path", path: "out/config.json", wantErr: true},
 		{name: "empty path", path: "", wantErr: true},

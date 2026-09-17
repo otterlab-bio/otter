@@ -29,9 +29,9 @@ same change or run resolution breaks.
 
 The rules sit under `workflows/` rather than at the project root because a
 Snakefile's `include:` directives resolve relative to the Snakefile's own
-directory. The legacy track still writes its Snakefiles to the project root, which
-is why the executor's `resolveSnakefilePath` checks the working directory before
-`workflows/`.
+directory. Pre-existing legacy projects keep their Snakefiles at the project
+root, which is why the executor's `resolveSnakefilePath` checks the working
+directory before `workflows/`.
 
 ## Direct submodules
 
@@ -41,10 +41,10 @@ is why the executor's `resolveSnakefilePath` checks the working directory before
 | `enva` | Rust | Rattler-first environment manager for `otter` runtime environments | The task is about env creation, activation, adoption, or compatibility with conda/mamba/micromamba |
 | `bamdriver` | Go | Shared BAM and BGZF driver library extracted from `xenofilx` and `pairbam` | The task changes BAM I/O, sorting, indexing, or shared low-level sequence utilities |
 | `pairbam` | Go | Filters paired-end BAM files and keeps only properly paired reads | The task is about paired BAM filtering outputs or BAM pairing logic |
-| `xenofilx` | Go | Pure-Go XenofilteR implementation for graft vs host BAM filtering | The task is about PDX host/graft classification or XenofilteR-style BAM processing |
+| `xenofilx` | Go | XenofilteR-compatible graft/host classifier using shared pure-Go `bamdriver` primitives | The task is about PDX host/graft classification or XenofilteR-style BAM processing |
 | `matsrun` | Go | rMATS orchestration CLI for pairwise RNA splicing comparisons | The task is about RNA splicing job generation, pdata parsing, or rmats.py execution flow |
 | `seq2mat` | Go | HTSeq count directory to expression matrix converter | The task is about HTSeq parsing, gene mapping, or matrix output generation |
-| `methx` | Rust | Bismark-to-HDF5 methylation processor compatible with the methrix R package | The task is about methylation processing, CpG extraction, or QC report generation |
+| `methx` | Rust | Bismark-to-custom-HDF5 methylation processor; native Methrix interoperability is provided by `scripts/export_methrix_hdf5.R` | The task is about methylation processing, CpG extraction, QC, or Methrix export |
 | `qctb` | Rust | QC summary reporting CLI for sequencing workflows | The task is about QC summary generation or replacing legacy R QC scripts |
 | `fastqcx` | Rust | FASTQ QC report generator with HTML and MultiQC summary output | The task is about raw FASTQ QC metrics, HTML reports, or summary file generation |
 

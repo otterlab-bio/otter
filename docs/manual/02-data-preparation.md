@@ -68,12 +68,16 @@ my_analysis/
 ls fastq/*_R1.fastq.gz
 ls fastq/*_R2.fastq.gz
 otter create \
+  --output my_project \
   --fastq ./fastq \
   --mode RRBS \
   --pdata ./samples.xlsx \
-  --output my_project/userspace \
-  --jobid preflight_rrbs
+  --reference-root "$OTTER_REFERENCE_ROOT" \
+  --reference-primary hg38@GRCh38.p14
 ```
+
+The canonical track always names a reference release, so the preflight needs a
+registry with that release published (see the [quick start](03-quickstart.md)).
 
 If pairing fails, first compare the actual suffixes, sample-name case, and pdata `sampleid` values. Do not rename files blindly when they are referenced by another pipeline.
 

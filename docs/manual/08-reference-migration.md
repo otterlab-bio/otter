@@ -74,8 +74,9 @@ $OTTER_REFERENCE_ROOT/
 
   The key is the reference **role** (`primary`, `secondary`, `graft`, `host`), not the
   reference id, and the digest field is `manifest_digest`. A release label is
-  mandatory and named `<assembly>-<annotation-source>-<annotation-version>`; the
-  layout and digest contract are defined in section 2 above.
+  mandatory; the naming convention `<assembly>-<annotation-source>-<annotation-version>`
+  is recommended but not enforced (the schema only requires `^[A-Za-z0-9._-]+$`).
+  The layout and digest contract are defined in section 2 above.
 
 ---
 

@@ -113,22 +113,9 @@ The PDX path adds:
 dual-reference evidence → xenofilx → pairbam/bamdriver → downstream analysis
 ```
 
-### The legacy track differs here
-
-With `--legacy` the species *are* flags, because that track predates the registry:
-
-```bash
-otter create --legacy \
-  --fastq ./fastq --mode RRBS --pdata ./samples.xlsx \
-  --species1 hg38 --species2 mm10 \
-  --output my_project/userspace --jobid demo_rrbs
-```
-
-`--species1` and `--species2` are **legacy-track only**. On the canonical track the
-first is ignored, and `--species2` merely signals PDX intent — the references must
-still come from `--reference-graft`/`--reference-host`. A canonical `create` with
-`--species1` and no reference flag fails with
-`scenario "rrbs" requires --reference-primary as id@release`.
+There are no species flags: the graft and host species come from the selected
+releases' own organism metadata. A `create` that names no reference role fails
+with `scenario "rrbs" requires --reference-primary as id@release`.
 
 ## Component mapping
 
