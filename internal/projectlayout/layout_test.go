@@ -50,29 +50,22 @@ func TestDetectReportsTrackFromMarkers(t *testing.T) {
 	}
 }
 
-func TestRequireTrackPointsAtTheProducingFlag(t *testing.T) {
+func TestRequireTrackPointsAtTheProducingCommand(t *testing.T) {
 	projectRoot := t.TempDir()
 	if err := RequireTrack(projectRoot, TrackV1); err == nil || !strings.Contains(err.Error(), "otter init") {
 		t.Fatalf("expected the missing v1 marker to name the producing command, got %v", err)
 	}
-	if err := RequireTrack(projectRoot, TrackLegacy); err == nil || !strings.Contains(err.Error(), "--legacy") {
-		t.Fatalf("expected the missing legacy marker to name --legacy, got %v", err)
+
+	// Legacy authoring has been removed, so requiring the legacy track is an
+	// internal error rather than a user hint.
+	if err := RequireTrack(projectRoot, TrackLegacy); err == nil || !strings.Contains(err.Error(), "unsupported required track") {
+		t.Fatalf("expected requiring the legacy track to be unsupported, got %v", err)
 	}
 
-	// A legacy project must be told to author legacy artifacts, not canonical
-	// ones, and vice versa.
+	// A pre-existing legacy project is routed at migration, not at authoring.
 	writeMarker(t, LegacyManifestPath(projectRoot), "{}\n")
-	if err := RequireTrack(projectRoot, TrackV1); err == nil || !strings.Contains(err.Error(), "--legacy") {
-		t.Fatalf("expected the legacy project to be pointed at --legacy, got %v", err)
-	}
-	if err := RequireTrack(projectRoot, TrackLegacy); err != nil {
-		t.Fatalf("legacy project should satisfy the legacy track: %v", err)
-	}
-
-	canonicalRoot := t.TempDir()
-	writeMarker(t, ProjectLockPath(canonicalRoot), "schema_version: "+ProjectLockSchemaVersion+"\nproject_id: p\n")
-	if err := RequireTrack(canonicalRoot, TrackLegacy); err == nil || !strings.Contains(err.Error(), ProjectLockFileName) {
-		t.Fatalf("expected the canonical project to be identified by %s, got %v", ProjectLockFileName, err)
+	if err := RequireTrack(projectRoot, TrackV1); err == nil || !strings.Contains(err.Error(), "otter config migrate") {
+		t.Fatalf("expected the legacy project to be routed at config migrate, got %v", err)
 	}
 }
 

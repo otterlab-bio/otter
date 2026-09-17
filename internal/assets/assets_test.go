@@ -36,105 +36,6 @@ func setupTestFS(t *testing.T) {
 	}
 }
 
-func TestCreateDirectoryStructure(t *testing.T) {
-	tmpDir := t.TempDir()
-	copier := NewAssetCopier(tmpDir, "rootless")
-
-	err := copier.CreateDirectoryStructure()
-	if err != nil {
-		t.Fatalf("CreateDirectoryStructure failed: %v", err)
-	}
-
-	expectedDirs := []string{
-		"config", "data", "envs", "inst", "R", "rules",
-		"saveRDS", "temp", "userspace", "workflows", "www",
-	}
-
-	for _, dir := range expectedDirs {
-		fullPath := filepath.Join(tmpDir, dir)
-		if info, err := os.Stat(fullPath); os.IsNotExist(err) {
-			t.Errorf("expected directory %s to exist", dir)
-		} else if !info.IsDir() {
-			t.Errorf("expected %s to be a directory", dir)
-		}
-	}
-}
-
-func TestCopyDir_FileContent(t *testing.T) {
-	setupTestFS(t)
-	tmpDir := t.TempDir()
-	copier := NewAssetCopier(tmpDir, "rootless")
-
-	// Copy Rscripts
-	err := copier.copyDir("inst/Rscripts", "R")
-	if err != nil {
-		t.Fatalf("copyDir failed: %v", err)
-	}
-
-	// Verify file was copied
-	destPath := filepath.Join(tmpDir, "R", "test.R")
-	if _, err := os.Stat(destPath); os.IsNotExist(err) {
-		t.Fatalf("expected %s to exist after copy", destPath)
-	}
-
-	content, err := os.ReadFile(destPath)
-	if err != nil {
-		t.Fatalf("failed to read copied file: %v", err)
-	}
-
-	expected := "# Test R script\nprint('hello')\n"
-	if string(content) != expected {
-		t.Errorf("file content mismatch.\nExpected: %q\nGot: %q", expected, string(content))
-	}
-}
-
-func TestCopyDir_CreatesParentDirs(t *testing.T) {
-	setupTestFS(t)
-	tmpDir := t.TempDir()
-	copier := NewAssetCopier(tmpDir, "rootless")
-
-	// Copy into a nested subdirectory that doesn't exist
-	err := copier.copyDir("inst/rules", "rules")
-	if err != nil {
-		t.Fatalf("copyDir failed: %v", err)
-	}
-
-	// Verify nested file exists
-	destPath := filepath.Join(tmpDir, "rules", "01fastqcxAtfirst.smk")
-	if _, err := os.Stat(destPath); os.IsNotExist(err) {
-		t.Fatalf("expected %s to exist after copy", destPath)
-	}
-}
-
-func TestCopyAll(t *testing.T) {
-	setupTestFS(t)
-	tmpDir := t.TempDir()
-	copier := NewAssetCopier(tmpDir, "rootless")
-
-	err := copier.CopyAll()
-	if err != nil {
-		t.Fatalf("CopyAll failed: %v", err)
-	}
-
-	// Verify key files were copied
-	checks := []struct {
-		path string
-		desc string
-	}{
-		{filepath.Join(tmpDir, "R", "test.R"), "R script"},
-		{filepath.Join(tmpDir, "BeaverBS_step1.snakemake"), "snakefile"},
-		{filepath.Join(tmpDir, "rules", "01fastqcxAtfirst.smk"), "rule"},
-		{filepath.Join(tmpDir, "envs", "otter-snakemake.yaml"), "env"},
-		{filepath.Join(tmpDir, "data", "gene_mapping.csv"), "data"},
-	}
-
-	for _, check := range checks {
-		if _, err := os.Stat(check.path); os.IsNotExist(err) {
-			t.Errorf("expected %s to exist (%s)", check.path, check.desc)
-		}
-	}
-}
-
 func TestListEmbeddedFiles(t *testing.T) {
 	setupTestFS(t)
 
@@ -165,20 +66,6 @@ func TestSetEmbeddedAssets(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("WalkDir failed: %v", err)
-	}
-}
-
-func TestNewAssetCopier_Defaults(t *testing.T) {
-	// Test with empty rulesType (should default to "rootless")
-	copier := NewAssetCopier("/tmp/project", "")
-	if copier.RulesType != "rootless" {
-		t.Errorf("expected RulesType 'rootless', got '%s'", copier.RulesType)
-	}
-
-	// Test with explicit legacy type
-	copier2 := NewAssetCopier("/tmp/project", "legacy")
-	if copier2.RulesType != "legacy" {
-		t.Errorf("expected RulesType 'legacy', got '%s'", copier2.RulesType)
 	}
 }
 
@@ -589,15 +476,13 @@ func TestQCWorkflowDeclaresQCTBConsumedArtifacts(t *testing.T) {
 	}
 }
 
-func TestCopyAll_EmptyEmbeddedAssets(t *testing.T) {
+func TestCopyV1ProjectAssets_EmptyEmbeddedAssets(t *testing.T) {
 	// Reset to empty
 	EmbeddedAssets = fstest.MapFS{}
-	tmpDir := t.TempDir()
-	copier := NewAssetCopier(tmpDir, "rootless")
+	copier := NewAssetCopier(t.TempDir())
 
-	// CopyAll should fail because embedded assets are empty
-	err := copier.CopyAll()
-	if err == nil {
+	// Pinning should fail because embedded assets are empty
+	if _, err := copier.CopyV1ProjectAssets(); err == nil {
 		t.Error("expected error with empty embedded assets")
 	}
 }

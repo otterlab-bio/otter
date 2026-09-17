@@ -13,15 +13,17 @@
 #              chain above. The shortcut's contract is equivalence, not merely
 #              success, so this leg fails if project.yaml, samples.tsv, or
 #              references.lock.yaml differ between the two paths.
-#   legacy   : otter init --legacy -> otter create --legacy -> assets verify ->
-#              config validate -> config migrate -> canonical validate ->
+#   migration: a pre-existing legacy config/otter.yaml (written as a fixture;
+#              legacy authoring has been removed) -> config validate (legacy
+#              and auto schemas) -> config migrate -> canonical validate ->
 #              resolve -> run --dry-run
 #   pairing  : the executor contract, asserted directly. The immutable
 #              run.yaml is the single execution boundary for BOTH executors:
 #              the snapshot selects its executor and --executor must agree.
-#              A legacy otter.yaml is an authoring format only, so it is
-#              refused by both executors until it is migrated and resolved.
-#   guards   : cross-track authoring refusals
+#              A legacy otter.yaml is refused by both executors until it is
+#              migrated and resolved.
+#   guards   : refusals that keep pre-existing legacy projects out of the
+#              canonical authoring commands
 #
 # What this deliberately does not do
 #   It never downloads a reference genome and never runs a genome index builder.
@@ -48,7 +50,6 @@ artifacts_directory=""
 fixture_root="${repository_root}/testdata/gate6/craftmake-downsample-20260906/fastq"
 craftmake_catalog="${repository_root}/craftmake/workflows"
 scenarios="rrbs,rnaseq,bs-pdx,rna-pdx"
-run_legacy_leg=true
 run_build_leg_flag=true
 keep_work_directory=false
 
@@ -68,7 +69,6 @@ optional:
   --fixture-root PATH      downsampled FASTQ root (default: testdata/gate6/...)
   --craftmake-catalog PATH craftmake workflow catalog (default: craftmake/workflows)
   --scenarios LIST         comma-separated subset of rrbs,rnaseq,bs-pdx,rna-pdx
-  --skip-legacy            skip the legacy compatibility leg
   --skip-build             skip the otter build comparison leg
   --keep                   keep the work directory (implies printing its path)
   --help                   show this message
@@ -86,7 +86,6 @@ while [[ $# -gt 0 ]]; do
     --fixture-root) fixture_root="${2:?}"; shift 2 ;;
     --craftmake-catalog) craftmake_catalog="${2:?}"; shift 2 ;;
     --scenarios) scenarios="${2:?}"; shift 2 ;;
-    --skip-legacy) run_legacy_leg=false; shift ;;
     --skip-build) run_build_leg_flag=false; shift ;;
     --keep) keep_work_directory=true; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -383,7 +382,6 @@ run_v1_scenario() {
     --reference-root "${OTTER_REFERENCE_ROOT}"
   )
   if [[ -n "${graft_reference}" ]]; then
-    create_arguments+=(--species2 mouse)
     create_arguments+=(--reference-graft "$(scenario_reference_selection "${graft_reference}")")
     create_arguments+=(--reference-host "$(scenario_reference_selection "${host_reference}")")
   else
@@ -415,7 +413,7 @@ run_v1_scenario() {
     return 1
   fi
   local file_mode
-  file_mode="$(stat -c '%a' "${run_yaml}")"
+  file_mode="$(stat -c '%a' "${run_yaml}" 2>/dev/null || stat -f '%Lp' "${run_yaml}")"
   if [[ "${file_mode}" != "444" ]]; then
     failed_stages=$((failed_stages + 1))
     stage_results+=("${scenario_name}/snapshot-immutable-mode|fail")
@@ -450,35 +448,70 @@ run_v1_scenario() {
   return 0
 }
 
-# ---------------------------------------------------------------------------
-# legacy compatibility leg
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# legacy migration leg
+# -----------------------------------------------------------------------------
 
-run_legacy_leg() {
-  CURRENT_SCENARIO="legacy"
-  local scenario_directory="${work_directory}/legacy"
+# write_legacy_fixture_project writes the on-disk shape of a pre-existing legacy
+# compatibility project: the .otter/assets.manifest.json track marker plus
+# config/otter.yaml under userspace/<jobid>/. Legacy authoring has been removed
+# from Otter, so the fixture stands in for the projects that already exist in
+# the wild; migration is the supported path for them.
+write_legacy_fixture_project() {
+  local project_root="$1"
+  local fastq_directory="$2"
+  local accession="$3"
+  mkdir -p "${project_root}/.otter" "${project_root}/userspace/legacy-demo/config"
+  printf '{}\n' > "${project_root}/.otter/assets.manifest.json"
+  cat > "${project_root}/userspace/legacy-demo/config/otter.yaml" <<FIXTURE
+# otter Analysis Project Configuration
+# Pre-existing legacy project fixture (authoring removed; migration supported).
+workflow:
+    jobid: legacy-demo
+    species:
+        graft: human
+        host: ""
+        name:
+            - human
+    samples:
+        - name: ${accession}
+          r1: ${fastq_directory}/${accession}_R1.fastq.gz
+          r2: ${fastq_directory}/${accession}_R2.fastq.gz
+input:
+    fastq_dir: ${fastq_directory}
+    suffix: _R1.fastq.gz
+    suffix2: _R2.fastq.gz
+engine:
+    type: auto
+metadata:
+    sample_ids:
+        - ${accession}
+SIDs:
+    - ${accession}
+mode: RRBS
+FIXTURE
+}
+
+run_migration_leg() {
+  CURRENT_SCENARIO="migration"
+  local scenario_directory="${work_directory}/migration"
   mkdir -p "${scenario_directory}"
   stage_scenario_fastq "SRR31480456" "${scenario_directory}"
 
-  log_section "legacy compatibility track"
+  log_section "legacy migration path"
 
-  stage_working_directory="${work_directory}"
-  run_stage "init" "${otter_binary}" init "${scenario_directory}/project" --legacy
+  write_legacy_fixture_project "${scenario_directory}/project" \
+    "${scenario_directory}/fastq" "SRR31480456"
+  local legacy_config="${scenario_directory}/project/userspace/legacy-demo/config/otter.yaml"
   stage_working_directory="${scenario_directory}"
 
-  run_stage "create" "${otter_binary}" create \
-    --legacy \
-    --fastq "${scenario_directory}/fastq" \
-    --pdata "${scenario_directory}/pdata.csv" \
-    --mode RRBS \
-    --output "${scenario_directory}/project/userspace" \
-    --jobid legacy-demo
-
-  local legacy_config="${scenario_directory}/project/userspace/legacy-demo/config/otter.yaml"
-  run_stage "assets-verify" "${otter_binary}" assets verify \
-    --project "${scenario_directory}/project" --strict
+  # The pre-migration sanity checks: the explicit legacy schema, and the auto
+  # detection that routes a schema_version-less file to the legacy loader.
   run_stage "config-validate-legacy" "${otter_binary}" config validate \
     --config "${legacy_config}" --schema legacy
+  run_stage "config-validate-auto" "${otter_binary}" config validate \
+    --config "${legacy_config}" --schema auto
+
 
   # The bridge the handoff found broken. Migration produces project INTENT
   # (project.yaml, samples.tsv, references.lock.yaml) but not the pinned asset
@@ -500,7 +533,7 @@ run_legacy_leg() {
     --reference-root "${OTTER_REFERENCE_ROOT}" \
     --backend local; then
     local migrated_run_yaml
-    migrated_run_yaml="$(tail -n 1 "${artifacts_directory}/legacy/config-resolve-migrated/stdout.txt")"
+    migrated_run_yaml="$(tail -n 1 "${artifacts_directory}/migration/config-resolve-migrated/stdout.txt")"
 
     # The migrated snapshot must select snakemake, not craftmake: the legacy
     # adapter maps the compatibility track onto the Snakemake executor. This is
@@ -510,12 +543,12 @@ run_legacy_leg() {
     migrated_executor="$(awk '/^execution:/{found=1} found && /^ *value:/{print $2; exit}' "${migrated_run_yaml}")"
     if [[ "${migrated_executor}" == "snakemake" ]]; then
       passed_stages=$((passed_stages + 1))
-      stage_results+=("legacy/migrated-snapshot-executor|pass")
-      log_pass "legacy: migrated snapshot selects snakemake"
+      stage_results+=("migration/migrated-snapshot-executor|pass")
+      log_pass "migration: migrated snapshot selects snakemake"
     else
       failed_stages=$((failed_stages + 1))
-      stage_results+=("legacy/migrated-snapshot-executor|fail")
-      log_fail "legacy: migrated snapshot selects ${migrated_executor}, expected snakemake"
+      stage_results+=("migration/migrated-snapshot-executor|fail")
+      log_fail "migration: migrated snapshot selects ${migrated_executor}, expected snakemake"
     fi
 
     # Craftmake must refuse a snakemake-selected snapshot, and the snakemake
@@ -532,29 +565,29 @@ run_legacy_leg() {
       "${otter_binary}" run --config "${migrated_run_yaml}" --executor snakemake --dry-run --foreground
     PATH="${previous_path}"
     if grep -q "All workflow steps completed successfully" \
-      "${artifacts_directory}/legacy/run-snakemake-dry-run-stub/stdout.txt" 2>/dev/null; then
+      "${artifacts_directory}/migration/run-snakemake-dry-run-stub/stdout.txt" 2>/dev/null; then
       passed_stages=$((passed_stages + 1))
-      stage_results+=("legacy/snakemake-planned-all-steps|pass")
-      log_pass "legacy: snakemake executor planned every step from the snapshot"
+      stage_results+=("migration/snakemake-planned-all-steps|pass")
+      log_pass "migration: snakemake executor planned every step from the snapshot"
     else
       failed_stages=$((failed_stages + 1))
-      stage_results+=("legacy/snakemake-planned-all-steps|fail")
-      log_fail "legacy: snakemake dry-run did not plan every step"
+      stage_results+=("migration/snakemake-planned-all-steps|fail")
+      log_fail "migration: snakemake dry-run did not plan every step"
     fi
   fi
 
-  # Cross-track guards. Each guard must fail for the right reason, so the
-  # expected message is asserted rather than merely a non-zero exit.
+  # Guards. Each guard must fail for the right reason, so the expected message
+  # is asserted rather than merely a non-zero exit.
   #
-  # 1. Canonical create refuses a legacy project directory.
+  # 1. Canonical create refuses a pre-existing legacy project directory.
   expect_failure "guard-canonical-create-on-legacy" "legacy compatibility project" \
     "${otter_binary}" create --output "${scenario_directory}/project" \
     --fastq "${scenario_directory}/fastq" --mode RRBS --jobid mixed \
     --reference-primary "hg19@GRCh37.p13-gencode-v19"
-  # 2. Legacy init refuses a canonical project directory. Use the canonical
-  #    scenario created earlier rather than the legacy one.
-  expect_failure "guard-legacy-init-on-canonical" "canonical v1 project" \
-    "${otter_binary}" init "${work_directory}/rrbs" --legacy
+  # 2. Canonical init refuses a pre-existing legacy project directory and
+  #    routes it at migration.
+  expect_failure "guard-canonical-init-on-legacy" "legacy compatibility project" \
+    "${otter_binary}" init "${scenario_directory}/project"
 
   run_executor_pairing_matrix "${legacy_config}"
 }
@@ -1028,9 +1061,7 @@ done
 # a scenario project using the generated profile.
 run_site_profile_leg
 
-if [[ "${run_legacy_leg}" == true ]]; then
-  run_legacy_leg || true
-fi
+run_migration_leg || true
 
 # The build leg runs after the scenarios so it reuses the registry they built,
 # and before the relative-input leg because it is an authoring contract rather
@@ -1074,11 +1105,14 @@ This rehearsal proves contract compatibility, not scientific correctness.
   contract; they cannot and do not align reads.
 - Craftmake: the dry-run leg stops at "craftmake plan". No workflow task
   executed, so no scientific output exists.
-- Snakemake: the compatibility leg runs with a STUB "snakemake" executable on
+- Snakemake: the migration leg runs with a STUB "snakemake" executable on
   PATH that answers only "snakemake --version". It therefore proves Otter-side
   dispatch, snapshot projection, resource resolution, and workflow planning. It
   executes no rule and produces no scientific output. In production this leg
   needs a real enva/conda runtime.
+- The migration leg starts from a FIXTURE legacy config/otter.yaml written by
+  this script. Legacy authoring has been removed from Otter, so the fixture
+  stands in for the pre-existing legacy projects that migration supports.
 - Known limitation exposed by that leg: a project migrated into an "otter init"
   root does not carry the ".snakemake" entry points where the compatibility
   executor looks for them, so it falls back to the workflow name and logs

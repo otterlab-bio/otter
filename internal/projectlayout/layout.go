@@ -1,18 +1,21 @@
 // Package projectlayout identifies the Otter project track a directory belongs
 // to and writes the marker files that make that track explicit.
 //
-// Otter has two project tracks that must not be mixed:
+// Otter recognises two project layouts that must not be mixed:
 //
 //   - The canonical v1 track, marked by project.lock.yaml. It carries
 //     project.yaml, samples.tsv, references.lock.yaml, pinned workflow assets,
-//     and immutable runs/<run-id>/run.yaml snapshots.
-//   - The legacy compatibility track, marked by .otter/assets.manifest.json.
-//     It carries config/otter.yaml under userspace/<jobid>/ and runs through the
-//     explicit Snakemake compatibility executor.
+//     and immutable runs/<run-id>/run.yaml snapshots. This is the only track
+//     Otter still authors.
+//   - The legacy compatibility layout, marked by .otter/assets.manifest.json.
+//     It carries config/otter.yaml under userspace/<jobid>/. Legacy authoring
+//     has been removed; the marker is still detected so "otter config migrate",
+//     "otter assets", and the run boundary can route pre-existing legacy
+//     projects correctly.
 //
-// A version marker is written by "otter init" and is the evidence a later
+// The canonical marker is written by "otter init" and is the evidence a later
 // command uses to refuse a mixed-track project instead of silently producing a
-// project that neither executor accepts.
+// project that no executor accepts.
 package projectlayout
 
 import (
@@ -97,7 +100,7 @@ func Detect(projectRoot string) (Track, error) {
 }
 
 // RequireTrack fails unless the project root already carries the wanted track
-// marker, and points at the flag that produces the missing one.
+// marker, and points at the command that produces the missing one.
 func RequireTrack(projectRoot string, wanted Track) error {
 	detected, err := Detect(projectRoot)
 	if err != nil {
@@ -106,32 +109,19 @@ func RequireTrack(projectRoot string, wanted Track) error {
 	if detected == wanted {
 		return nil
 	}
-	switch wanted {
-	case TrackV1:
-		if detected == TrackLegacy {
-			return fmt.Errorf(
-				"%s is a legacy compatibility project (%s); rerun with --legacy to write config/otter.yaml, or create a canonical project with `otter init <name>` instead",
-				projectRoot, filepath.Join(".otter", filepath.Base(LegacyManifestPath(projectRoot))),
-			)
-		}
-		return fmt.Errorf(
-			"%s has no %s marker; run `otter init <project>` first so the canonical project assets are pinned",
-			projectRoot, ProjectLockFileName,
-		)
-	case TrackLegacy:
-		if detected == TrackV1 {
-			return fmt.Errorf(
-				"%s is a canonical v1 project (%s); rerun with `otter init <name>` and omit --legacy, or pass --legacy only to projects initialised with --legacy",
-				projectRoot, ProjectLockFileName,
-			)
-		}
-		return fmt.Errorf(
-			"%s has no legacy assets manifest; run `otter init <project> --legacy` first",
-			projectRoot,
-		)
-	default:
+	if wanted != TrackV1 {
 		return fmt.Errorf("unsupported required track %q", wanted)
 	}
+	if detected == TrackLegacy {
+		return fmt.Errorf(
+			"%s is a legacy compatibility project (%s); convert it with `otter config migrate`, or create a canonical project with `otter init <name>` instead",
+			projectRoot, filepath.Join(".otter", filepath.Base(LegacyManifestPath(projectRoot))),
+		)
+	}
+	return fmt.Errorf(
+		"%s has no %s marker; run `otter init <project>` first so the canonical project assets are pinned",
+		projectRoot, ProjectLockFileName,
+	)
 }
 
 // WriteProjectLock stamps the canonical marker. It refuses to overwrite an

@@ -14,8 +14,11 @@ import (
 // convenience flag. They are separate from create_v1_test.go because they
 // exercise "otter run", not the authoring commands.
 
-// TestLegacyConfigMigrateProducesResolvableProject closes the loop the handoff
-// found broken: create (legacy) output must survive "otter config migrate".
+// TestLegacyConfigMigrateProducesResolvableProject covers the supported path
+// for pre-existing legacy projects: a config/otter.yaml that already exists in
+// the wild must survive "otter config migrate" and resolve to a snakemake
+// snapshot. Legacy authoring has been removed, so the fixture is written
+// directly, the way an old checkout already carries it.
 func TestLegacyConfigMigrateProducesResolvableProject(t *testing.T) {
 	projectRoot := t.TempDir()
 	fastqDirectory := filepath.Join(projectRoot, "fastq")
@@ -26,23 +29,30 @@ func TestLegacyConfigMigrateProducesResolvableProject(t *testing.T) {
 		writeTestFile(t, filepath.Join(fastqDirectory, sampleName+"_R1.fastq.gz"), "@"+sampleName+"/1\nACGT\n+\nIIII\n")
 		writeTestFile(t, filepath.Join(fastqDirectory, sampleName+"_R2.fastq.gz"), "@"+sampleName+"/2\nACGT\n+\nIIII\n")
 	}
-	writeTestFile(t, filepath.Join(projectRoot, "pdata.csv"),
-		"sampleid,inline_barcode_sequence,condition\nsample1,,case\n")
 
-	userspaceRoot := filepath.Join(projectRoot, "userspace")
-	createOutput := executeCommand(t, rootCmd, "create",
-		"--legacy",
-		"--fastq", fastqDirectory,
-		"--pdata", filepath.Join(projectRoot, "pdata.csv"),
-		"--mode", "RRBS",
-		"--output", userspaceRoot,
-		"--jobid", "legacy-demo",
-	)
-	if createOutput.exitCode != 0 {
-		t.Fatalf("legacy create failed: %s%s", createOutput.stdout, createOutput.stderr)
-	}
-
-	legacyConfigPath := filepath.Join(userspaceRoot, "legacy-demo", "config", "otter.yaml")
+	legacyConfigPath := filepath.Join(projectRoot, "userspace", "legacy-demo", "config", "otter.yaml")
+	writeTestFile(t, legacyConfigPath, "# otter Analysis Project Configuration (pre-existing legacy fixture)\n"+
+		"workflow:\n"+
+		"    jobid: legacy-demo\n"+
+		"    species:\n"+
+		"        graft: human\n"+
+		"        host: \"\"\n"+
+		"        name:\n"+
+		"            - human\n"+
+		"    samples:\n"+
+		"        - name: sample1\n"+
+		"          r1: "+filepath.Join(fastqDirectory, "sample1_R1.fastq.gz")+"\n"+
+		"          r2: "+filepath.Join(fastqDirectory, "sample1_R2.fastq.gz")+"\n"+
+		"input:\n"+
+		"    fastq_dir: "+fastqDirectory+"\n"+
+		"    suffix: _R1.fastq.gz\n"+
+		"    suffix2: _R2.fastq.gz\n"+
+		"metadata:\n"+
+		"    sample_ids:\n"+
+		"        - sample1\n"+
+		"SIDs:\n"+
+		"    - sample1\n"+
+		"mode: RRBS\n")
 
 	// Migration must leave behind a resolvable project, so it needs a registry
 	// to lock the declared references against.
