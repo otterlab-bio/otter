@@ -237,6 +237,13 @@ func WriteStubRelease(request StubReleaseRequest) (*StubReleaseResult, error) {
 		return nil, err
 	}
 
+	// The release contract includes checksums.sha256, and the installer fetches it
+	// as a contract file. A stub that omits it is not the layout the production
+	// publisher produces, which is the one thing this fixture exists to reproduce.
+	if err := refpkg.WriteChecksums(releaseRoot, manifestReport); err != nil {
+		return nil, fmt.Errorf("write stub checksums: %w", err)
+	}
+
 	if err := refpkg.VerifyReleaseIdentity(releaseRoot, manifestDigest); err != nil {
 		return nil, fmt.Errorf("stub release failed production identity verification: %w", err)
 	}

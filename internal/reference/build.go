@@ -73,7 +73,7 @@ func BuildRelease(request BuildRequest) (*BuildResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("publish staged reference manifest: %w", err)
 	}
-	if err := writeChecksums(stagingReleaseDirectory, manifestReport); err != nil {
+	if err := WriteChecksums(stagingReleaseDirectory, manifestReport); err != nil {
 		return nil, err
 	}
 	manifestDigest, err := digestFile(manifestReport.ManifestPath)
@@ -374,7 +374,15 @@ func writeReferenceDefinition(releaseRoot string, definition configv1.ReferenceD
 	return nil
 }
 
-func writeChecksums(releaseRoot string, manifestReport *ManifestReport) error {
+// WriteChecksums writes the sha256sum-format checksums.sha256 for a published
+// release, including the manifest digest itself so the file covers the whole
+// release.
+//
+// It is exported so the offline stub registry writes the same file the production
+// publisher does. The two drifting apart is how a fixture stops being a fixture:
+// the e2e rehearsal would pass against a layout the real build never produces, or
+// fail against one it always does.
+func WriteChecksums(releaseRoot string, manifestReport *ManifestReport) error {
 	entries := append([]ManifestEntry(nil), manifestReport.Entries...)
 	manifestDigest, err := digestFile(manifestReport.ManifestPath)
 	if err != nil {

@@ -139,6 +139,7 @@ func TestStubReleaseUsesRealReferenceBuildLayout(t *testing.T) {
 	for _, relativePath := range []string{
 		"reference.yaml",
 		"manifest.json",
+		"checksums.sha256",
 		"fasta/mm10.fa",
 		"fasta/mm10.fa.fai",
 		"annotations/mm10.gtf",
@@ -149,5 +150,63 @@ func TestStubReleaseUsesRealReferenceBuildLayout(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(expectedRoot, filepath.FromSlash(relativePath))); err != nil {
 			t.Errorf("expected layout entry %s: %v", relativePath, err)
 		}
+	}
+}
+
+// TestStubReleaseChecksumsCoverEveryFile keeps the stub's checksums.sha256 a real
+// checksum file rather than a placeholder.
+//
+// checksums.sha256 is part of the release contract and the installer fetches it as
+// a contract file, so a stub that omits it — or writes digests that do not match —
+// would hand the rehearsal a layout the production publisher never produces.
+func TestStubReleaseChecksumsCoverEveryFile(t *testing.T) {
+	registryRoot := t.TempDir()
+	result, err := WriteStubRelease(StubReleaseRequest{
+		RegistryRoot: registryRoot,
+		ReferenceID:  "hg19",
+		Release:      "GRCh37.p13-gencode-v19",
+		Organism:     "Homo sapiens",
+		Assembly:     "GRCh37.p13",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checksumBytes, err := os.ReadFile(filepath.Join(result.ReleaseRoot, "checksums.sha256"))
+	if err != nil {
+		t.Fatalf("read checksums.sha256: %v", err)
+	}
+	if len(checksumBytes) == 0 {
+		t.Fatal("checksums.sha256 is empty")
+	}
+
+	// Every line must be "<hex>  <path>" and must match the file it names. This is
+	// what "sha256sum -c" checks, so verifying it here means the e2e rehearsal can
+	// rely on the file without re-implementing the format.
+	lineCount := 0
+	for _, line := range strings.Split(strings.TrimSpace(string(checksumBytes)), "\n") {
+		fields := strings.SplitN(line, "  ", 2)
+		if len(fields) != 2 {
+			t.Fatalf("checksums.sha256 line is not <digest>  <path>: %q", line)
+		}
+		relativePath, expectedDigest := fields[1], fields[0]
+		content, err := os.ReadFile(filepath.Join(result.ReleaseRoot, filepath.FromSlash(relativePath)))
+		if err != nil {
+			t.Errorf("checksums.sha256 names a file that does not exist: %s: %v", relativePath, err)
+			continue
+		}
+		if actual := refpkg.ComputeDigest(string(content)); strings.TrimPrefix(actual, "sha256:") != expectedDigest {
+			t.Errorf("checksum mismatch for %s: manifest says %s, file is %s", relativePath, expectedDigest, actual)
+		}
+		lineCount++
+	}
+	if lineCount == 0 {
+		t.Fatal("checksums.sha256 contains no entries")
+	}
+
+	// The manifest digest itself must be covered, or the file does not attest the
+	// release identity that "otter config resolve" locks.
+	if !strings.Contains(string(checksumBytes), "  manifest.json\n") {
+		t.Error("checksums.sha256 does not cover manifest.json")
 	}
 }
