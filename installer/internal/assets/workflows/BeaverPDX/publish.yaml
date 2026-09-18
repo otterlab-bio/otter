@@ -89,7 +89,7 @@ jobs:
           test -s "$staging_graft_directory/bismark_summary_report.html"
           test -s "$staging_methylation_directory/methrix_data.h5"
 
-          python - "$declaration_path" "$staging_graft_directory" <<'PY'
+          python3 - "$declaration_path" "$staging_graft_directory" <<'PY'
           import json
           import os
           import pathlib
@@ -160,7 +160,7 @@ jobs:
             local staged_directory="$1"
             local published_directory="$2"
             if [ -e "$published_directory" ]; then
-              python - "$staged_directory" "$published_directory" <<'PY'
+              python3 - "$staged_directory" "$published_directory" <<'PY'
           import hashlib
           import pathlib
           import sys
@@ -188,5 +188,6 @@ jobs:
 
           "$otter_cli" artifact publish '${{ paths.config }}' "$declaration_path"
           test -f "$manifest_path"
-          test "$(stat -c '%a' "$manifest_path")" = 444
+          manifest_mode="$(stat -c '%a' "$manifest_path" 2>/dev/null || stat -f '%Lp' "$manifest_path")"
+          test "$manifest_mode" = 444
           "$otter_cli" artifact verify '${{ paths.config }}'

@@ -53,13 +53,16 @@ jobs:
           outcome_path='${{ outputs.outcome }}'
           mkdir -p "$splicing_directory"
           if [ '${{ config.metadata.group_levels }}' -ge 2 ]; then
-            matsrun run --root '${{ config.directories.bsmap.main }}' --threads '${{ resources.cores }}' --pdata '${{ config.directories.selfconfig }}/pdata.xlsx' --seqlengthQC '${{ config.directories.qc.main }}' --gtf '${{ inputs.annotation }}' --pdxmode 1
-            mapfile -t artifact_paths < <(find "$splicing_directory" -type f ! -name 'splicing-outcome.json' -printf '%P\n' | sort)
+            matsrun run --root '${{ config.directories.bsmap.main }}' --threads '${{ resources.cores }}' --pdata '${{ config.directories.selfconfig }}/pdata.xlsx' --seqlengthQC '${{ config.directories.qc.after }}' --seqlength-qc-format fastqcx --gtf '${{ inputs.annotation }}' --pdxmode 1
+            artifact_paths=()
+            while IFS= read -r artifact_path; do
+              artifact_paths+=("$artifact_path")
+            done < <(cd "$splicing_directory" && find . -type f ! -name 'splicing-outcome.json' | sed 's|^\./||' | sort)
             if [ "${#artifact_paths[@]}" -eq 0 ]; then
               printf 'matsrun reported success but produced no splicing artifacts in %s\n' "$splicing_directory" >&2
               exit 1
             fi
-            python - "$outcome_path" "$splicing_directory" "${artifact_paths[@]}" <<'PY'
+            python3 - "$outcome_path" "$splicing_directory" "${artifact_paths[@]}" <<'PY'
           import json
           import pathlib
           import sys
@@ -74,7 +77,7 @@ jobs:
           outcome_path.write_text(json.dumps(outcome, indent=2) + "\n", encoding="utf-8")
           PY
           else
-            python - "$outcome_path" "$splicing_directory" <<'PY'
+            python3 - "$outcome_path" "$splicing_directory" <<'PY'
           import json
           import pathlib
           import sys

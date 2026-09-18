@@ -48,7 +48,8 @@ jobs:
           [[ -f "${archive_path}" && ! -L "${archive_path}" ]]
           [[ -f "${archive_checksum_path}" && ! -L "${archive_checksum_path}" ]]
           [[ ! -e "${output_root}" && ! -e "${staging_root}" && ! -e "${publication_root}" ]]
-          [[ "$(stat -c '%s' "${archive_path}")" == "${expected_archive_bytes}" ]]
+          archive_bytes="$(stat -c '%s' "${archive_path}" 2>/dev/null || stat -f '%z' "${archive_path}")"
+          [[ "${archive_bytes}" == "${expected_archive_bytes}" ]]
           [[ "$(md5sum "${archive_path}" | cut -d' ' -f1)" == "${expected_archive_md5}" ]]
           [[ "$(sha256sum "${archive_path}" | cut -d' ' -f1)" == "${expected_archive_sha256}" ]]
           (cd "$(dirname "${archive_path}")" && sha256sum -c "${archive_checksum_path}")

@@ -96,7 +96,7 @@ jobs:
           mv "$temporary_declaration_path" "$declaration_path"
 
           if [ -e "$final_methylation_directory" ]; then
-            python - "$staging_methylation_directory" "$final_methylation_directory" <<'PY'
+            python3 - "$staging_methylation_directory" "$final_methylation_directory" <<'PY'
           import hashlib
           import pathlib
           import sys
@@ -120,5 +120,6 @@ jobs:
 
           "$otter_cli" artifact publish '${{ paths.config }}' "$declaration_path"
           test -f "$manifest_path"
-          test "$(stat -c '%a' "$manifest_path")" = 444
+          manifest_mode="$(stat -c '%a' "$manifest_path" 2>/dev/null || stat -f '%Lp' "$manifest_path")"
+          test "$manifest_mode" = 444
           "$otter_cli" artifact verify '${{ paths.config }}'

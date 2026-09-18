@@ -132,8 +132,8 @@ jobs:
           mv "${temporary_gtf}" '${{ outputs.gtf }}'
           {
             printf 'asset\tsha256\tsize_bytes\tpath\n'
-            printf 'fasta\t%s\t%s\t%s\n' "$(sha256sum '${{ outputs.fasta }}' | awk '{print $1}')" "$(stat -c '%s' '${{ outputs.fasta }}')" '${{ outputs.fasta }}'
-            printf 'gtf\t%s\t%s\t%s\n' "$(sha256sum '${{ outputs.gtf }}' | awk '{print $1}')" "$(stat -c '%s' '${{ outputs.gtf }}')" '${{ outputs.gtf }}'
+            printf 'fasta\t%s\t%s\t%s\n' "$(sha256sum '${{ outputs.fasta }}' | awk '{print $1}')" "$(stat -c '%s' '${{ outputs.fasta }}' 2>/dev/null || stat -f '%z' '${{ outputs.fasta }}')" '${{ outputs.fasta }}'
+            printf 'gtf\t%s\t%s\t%s\n' "$(sha256sum '${{ outputs.gtf }}' | awk '{print $1}')" "$(stat -c '%s' '${{ outputs.gtf }}' 2>/dev/null || stat -f '%z' '${{ outputs.gtf }}')" '${{ outputs.gtf }}'
           } > '${{ outputs.preparation_manifest }}'
 
   publish_release:

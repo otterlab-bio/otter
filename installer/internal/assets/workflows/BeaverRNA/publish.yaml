@@ -48,7 +48,7 @@ jobs:
           staging_root="$(mktemp -d "$staging_parent/rna.XXXXXX")"
           trap 'rm -rf "$staging_root"' EXIT
           staging_splicing_directory="$staging_root/splicing"
-          python - '${{ inputs.splicing_outcome }}' "$staging_splicing_directory" "$declaration_path" <<'PY'
+          python3 - '${{ inputs.splicing_outcome }}' "$staging_splicing_directory" "$declaration_path" <<'PY'
           import json
           import os
           import pathlib
@@ -131,7 +131,7 @@ jobs:
           PY
 
           if [ -e "$final_splicing_directory" ]; then
-            python - "$staging_splicing_directory" "$final_splicing_directory" <<'PY'
+            python3 - "$staging_splicing_directory" "$final_splicing_directory" <<'PY'
           import hashlib
           import pathlib
           import sys
@@ -152,7 +152,9 @@ jobs:
           PY
           else
             mkdir -p "$(dirname "$final_splicing_directory")"
-            if [ "$(stat -c '%d' "$staging_splicing_directory")" != "$(stat -c '%d' "$(dirname "$final_splicing_directory")")" ]; then
+            staging_device="$(stat -c '%d' "$staging_splicing_directory" 2>/dev/null || stat -f '%d' "$staging_splicing_directory")"
+            final_device="$(stat -c '%d' "$(dirname "$final_splicing_directory")" 2>/dev/null || stat -f '%d' "$(dirname "$final_splicing_directory")")"
+            if [ "$staging_device" != "$final_device" ]; then
               printf 'Publication staging and results must share a filesystem for atomic directory publication.\n' >&2
               exit 1
             fi
@@ -161,5 +163,6 @@ jobs:
 
           "$otter_cli" artifact publish '${{ paths.config }}' "$declaration_path"
           test -f "$manifest_path"
-          test "$(stat -c '%a' "$manifest_path")" = 444
+          manifest_mode="$(stat -c '%a' "$manifest_path" 2>/dev/null || stat -f '%Lp' "$manifest_path")"
+          test "$manifest_mode" = 444
           "$otter_cli" artifact verify '${{ paths.config }}'
