@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  migrate_legacy_reference.sh
-#  Migrates legacy reference genome assets from $beaverhome/inst into the
-#  canonical immutable Otter Reference Registry ($OTTER_REFERENCE_ROOT).
+#  Migrates legacy reference genome assets into the canonical immutable Otter
+#  Reference Registry ($OTTER_REFERENCE_ROOT).
 #
 #  Usage:
 #    bash scripts/migrate_legacy_reference.sh [OPTIONS]
@@ -20,9 +20,9 @@
 #
 #  Example:
 #    bash scripts/migrate_legacy_reference.sh \
-#      --legacy-inst /data_center_02/project/SR/zhengyanhua/beaverflow1016/inst \
+#      --legacy-inst /path/to/legacy/inst \
 #      --species hg19 \
-#      --registry-root /data_center_02/project/SR/zhengyanhua/otter0907/references \
+#      --registry-root /path/to/otter/references \
 #      --mode rebuild \
 #      --threads 8
 # =============================================================================
