@@ -46,7 +46,7 @@ $OTTER_REFERENCE_ROOT/
   reference id, and the digest field is `manifest_digest`. A release label is
   mandatory; the naming convention `<assembly>-<annotation-source>-<annotation-version>`
   is recommended but not enforced (the schema only requires `^[A-Za-z0-9._-]+$`).
-  The layout and digest contract are defined in section 2 above.
+  The layout and digest contract are defined in this section.
 
 ---
 
