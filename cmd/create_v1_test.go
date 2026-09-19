@@ -21,7 +21,6 @@ func TestMain(m *testing.M) {
 		"inst/snakefiles/BeaverBS_step1.snakemake": &fstest.MapFile{Data: []byte("rule step1:\n  shell: 'echo step1'\n")},
 		"inst/snakefiles/BeaverBS_step2.snakemake": &fstest.MapFile{Data: []byte("rule step2:\n  shell: 'echo step2'\n")},
 		"inst/rules/01fastqcxAtfirst.smk":          &fstest.MapFile{Data: []byte("rule fastqcxAtfirst:\n  shell: 'fastqcx {input}'\n")},
-		"inst/rules_legacy/legacy_rule.smk":        &fstest.MapFile{Data: []byte("rule legacy:\n  shell: 'echo legacy'\n")},
 		"inst/Rscripts/test.R":                     &fstest.MapFile{Data: []byte("# Test R script\nprint('hello')\n")},
 		"inst/envs/otter-snakemake.yaml":           &fstest.MapFile{Data: []byte("name: otter-snakemake\n")},
 		"inst/data/gene_mapping.csv":               &fstest.MapFile{Data: []byte("ensembl_id,symbol\nENSG001,BRCA1\n")},
@@ -360,14 +359,13 @@ func TestCanonicalCreateRejectsWGBSPDX(t *testing.T) {
 		"--output", projectRoot,
 		"--fastq", filepath.Join(projectRoot, "data"),
 		"--mode", "WGBS",
-		"--species2", "mouse",
 		"--jobid", "wgbs-pdx",
 		"--reference-root", registryRoot,
 		"--reference-graft", selection,
 		"--reference-host", selection,
 	)
 	if output.exitCode == 0 {
-		t.Fatal("expected WGBS with a second species to be rejected")
+		t.Fatal("expected WGBS with a PDX reference selection to be rejected")
 	}
 	if !strings.Contains(output.stderr, "WGBS has no PDX scenario") {
 		t.Fatalf("expected an explicit WGBS-PDX refusal, got:\n%s", output.stderr)
@@ -384,7 +382,6 @@ func TestCanonicalCreateRequiresScenarioMatchingReferenceFlag(t *testing.T) {
 		"--output", projectRoot,
 		"--fastq", filepath.Join(projectRoot, "data"),
 		"--mode", "RRBS",
-		"--species2", "mouse",
 		"--jobid", "wrong-flag",
 		"--reference-root", registryRoot,
 		"--reference-primary", selection,
@@ -472,64 +469,34 @@ func TestCanonicalCreateRefusesLegacyProjectDirectory(t *testing.T) {
 	if output.exitCode == 0 {
 		t.Fatal("expected canonical create to refuse a legacy project directory")
 	}
-	if !strings.Contains(output.stderr, "--legacy") {
-		t.Fatalf("expected the error to point at --legacy, got:\n%s", output.stderr)
+	if !strings.Contains(output.stderr, "otter config migrate") {
+		t.Fatalf("expected the error to route the legacy project at config migrate, got:\n%s", output.stderr)
 	}
 }
 
-// TestCreateLegacyTrackStillWritesOtterYAML is the characterization test for the
-// compatibility track: --legacy must keep producing config/otter.yaml under
-// userspace/<jobid>, and the legacy marker must remain the track evidence.
-func TestCreateLegacyTrackStillWritesOtterYAML(t *testing.T) {
-	projectRoot := t.TempDir()
-	if err := os.MkdirAll(projectRoot, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	fastqDirectory := filepath.Join(projectRoot, "fastq")
-	if err := os.MkdirAll(fastqDirectory, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, sampleName := range []string{"sample1", "sample2"} {
-		writeTestFile(t, filepath.Join(fastqDirectory, sampleName+"_R1.fastq.gz"), "@"+sampleName+"/1\nACGT\n+\nIIII\n")
-		writeTestFile(t, filepath.Join(fastqDirectory, sampleName+"_R2.fastq.gz"), "@"+sampleName+"/2\nACGT\n+\nIIII\n")
-	}
-	writeTestFile(t, filepath.Join(projectRoot, "pdata.csv"),
-		"sampleid,inline_barcode_sequence,condition\nsample1,,case\nsample2,,control\n")
-
-	userspaceRoot := filepath.Join(projectRoot, "userspace")
-	output := executeCommand(t, rootCmd, "create",
+// TestCreateRefusesRemovedLegacyFlags pins the removal of the legacy authoring
+// track: the flags that selected or parameterised it must no longer parse.
+func TestCreateRefusesRemovedLegacyFlags(t *testing.T) {
+	for _, removedFlag := range []string{
 		"--legacy",
-		"--fastq", fastqDirectory,
-		"--pdata", filepath.Join(projectRoot, "pdata.csv"),
-		"--mode", "RRBS",
-		"--output", userspaceRoot,
-		"--jobid", "legacy-demo",
-	)
-	if output.exitCode != 0 {
-		t.Fatalf("legacy create failed (exit %d):\n%s\n%s", output.exitCode, output.stdout, output.stderr)
-	}
-
-	configPath := filepath.Join(userspaceRoot, "legacy-demo", "config", "otter.yaml")
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("legacy create did not write %s: %v", configPath, err)
-	}
-	configText := string(configData)
-	// These keys are the legacy contract the Snakemake assets index into.
-	for _, expectedKey := range []string{"SIDs:", "directories:", "reference:", "workflow:", "species:"} {
-		if !strings.Contains(configText, expectedKey) {
-			t.Errorf("legacy otter.yaml is missing %q", expectedKey)
+		"--species1=human",
+		"--species2=mouse",
+		"--genome1-fasta=x.fa",
+		"--genome1-index=idx/",
+		"--genome2-fasta=y.fa",
+		"--genome2-index=idy/",
+		"--gtf1=a.gtf",
+		"--gtf2=b.gtf",
+		"--star-index1=s1/",
+		"--star-index2=s2/",
+		"--conda-env=env",
+	} {
+		output := executeCommand(t, rootCmd, "create", "--fastq", t.TempDir(), removedFlag)
+		if output.exitCode == 0 {
+			t.Errorf("create accepted removed legacy flag %s", removedFlag)
 		}
-	}
-	// species.name must stay a sequence: the Snakemake assets call .index() on it.
-	if !strings.Contains(configText, "name:\n            - human") {
-		t.Errorf("legacy otter.yaml must write workflow.species.name as a sequence:\n%s", configText)
-	}
-	// The canonical artifacts must not appear on the legacy track.
-	for _, mustNotExist := range []string{"project.yaml", "samples.tsv", "references.lock.yaml"} {
-		if _, err := os.Stat(filepath.Join(userspaceRoot, "legacy-demo", mustNotExist)); err == nil {
-			t.Errorf("legacy create must not write %s", mustNotExist)
+		if !strings.Contains(output.stderr, "unknown flag") {
+			t.Errorf("expected an unknown-flag error for %s, got:\n%s", removedFlag, output.stderr)
 		}
 	}
 }
@@ -578,63 +545,31 @@ func TestInitCanonicalTrackWritesProjectLock(t *testing.T) {
 	}
 }
 
-// TestInitLegacyTrackKeepsCompatibilityLayout covers the legacy init contract.
-func TestInitLegacyTrackKeepsCompatibilityLayout(t *testing.T) {
-	projectRoot := filepath.Join(t.TempDir(), "legacy-project")
-	output := executeCommand(t, rootCmd, "init", projectRoot, "--legacy")
-	if output.exitCode != 0 {
-		t.Fatalf("legacy init failed (exit %d):\n%s\n%s", output.exitCode, output.stdout, output.stderr)
-	}
-	for _, expectedDirectory := range []string{"config", "data", "envs", "inst", "R", "rules", "saveRDS", "temp", "userspace", "www"} {
-		if _, err := os.Stat(filepath.Join(projectRoot, expectedDirectory)); err != nil {
-			t.Errorf("legacy init did not create %s/: %v", expectedDirectory, err)
-		}
-	}
-	if _, err := os.Stat(filepath.Join(projectRoot, ".otter", "assets.manifest.json")); err != nil {
-		t.Fatalf("legacy init did not stamp the assets manifest: %v", err)
-	}
-	// The legacy layout creates an empty workflows/ directory. It must stay
-	// unpopulated: populating it is what the canonical track does.
-	workflowEntries, err := os.ReadDir(filepath.Join(projectRoot, "workflows"))
-	if err != nil {
-		t.Fatalf("legacy init did not create workflows/: %v", err)
-	}
-	if len(workflowEntries) != 0 {
-		t.Errorf("legacy init must leave workflows/ empty, found %d entries", len(workflowEntries))
-	}
-	if _, err := os.Stat(filepath.Join(projectRoot, "project.lock.yaml")); err == nil {
-		t.Error("legacy init must not write the canonical project.lock.yaml")
-	}
-}
-
-// TestInitTrackMismatchIsRefused covers both mixed-track directions.
-func TestInitTrackMismatchIsRefused(t *testing.T) {
+// TestInitRefusesLegacyProjectAndRemovedFlags covers the remaining legacy
+// behaviour of init: a pre-existing legacy project directory is detected and
+// routed at migration, and the removed authoring flags no longer parse.
+func TestInitRefusesLegacyProjectAndRemovedFlags(t *testing.T) {
 	baseDirectory := t.TempDir()
-	canonicalRoot := filepath.Join(baseDirectory, "canonical")
 	legacyRoot := filepath.Join(baseDirectory, "legacy")
 
-	if output := executeCommand(t, rootCmd, "init", canonicalRoot); output.exitCode != 0 {
-		t.Fatalf("canonical init failed: %s%s", output.stdout, output.stderr)
-	}
-	if output := executeCommand(t, rootCmd, "init", legacyRoot, "--legacy"); output.exitCode != 0 {
-		t.Fatalf("legacy init failed: %s%s", output.stdout, output.stderr)
-	}
-
-	legacyOverCanonical := executeCommand(t, rootCmd, "init", canonicalRoot, "--legacy")
-	if legacyOverCanonical.exitCode == 0 || !strings.Contains(legacyOverCanonical.stderr, "canonical v1 project") {
-		t.Fatalf("expected legacy init over a canonical project to be refused, got exit=%d stderr=%s",
-			legacyOverCanonical.exitCode, legacyOverCanonical.stderr)
-	}
+	// The marker is what makes a directory a legacy project; write it directly,
+	// the way an old checkout in the wild already carries it.
+	writeTestFile(t, filepath.Join(legacyRoot, ".otter", "assets.manifest.json"), "{}\n")
 
 	canonicalOverLegacy := executeCommand(t, rootCmd, "init", legacyRoot)
 	if canonicalOverLegacy.exitCode == 0 || !strings.Contains(canonicalOverLegacy.stderr, "legacy compatibility project") {
-		t.Fatalf("expected canonical init over a legacy project to be refused, got exit=%d stderr=%s",
+		t.Fatalf("expected init over a legacy project to be refused, got exit=%d stderr=%s",
 			canonicalOverLegacy.exitCode, canonicalOverLegacy.stderr)
 	}
+	if !strings.Contains(canonicalOverLegacy.stderr, "otter config migrate") {
+		t.Fatalf("expected the refusal to route at config migrate, got stderr=%s", canonicalOverLegacy.stderr)
+	}
 
-	legacyRulesWithoutLegacy := executeCommand(t, rootCmd, "init", filepath.Join(baseDirectory, "x"), "--legacy-rules")
-	if legacyRulesWithoutLegacy.exitCode == 0 || !strings.Contains(legacyRulesWithoutLegacy.stderr, "--legacy-rules only applies") {
-		t.Fatalf("expected --legacy-rules without --legacy to be refused, got exit=%d stderr=%s",
-			legacyRulesWithoutLegacy.exitCode, legacyRulesWithoutLegacy.stderr)
+	for _, removedFlag := range []string{"--legacy", "--legacy-rules"} {
+		output := executeCommand(t, rootCmd, "init", filepath.Join(baseDirectory, "x"), removedFlag)
+		if output.exitCode == 0 || !strings.Contains(output.stderr, "unknown flag") {
+			t.Fatalf("expected init %s to fail as an unknown flag, got exit=%d stderr=%s",
+				removedFlag, output.exitCode, output.stderr)
+		}
 	}
 }

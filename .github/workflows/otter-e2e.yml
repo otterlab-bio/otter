@@ -104,3 +104,101 @@ jobs:
             --metric "Craftmake toolchain|built from the craftmake submodule at this commit" \
             --artifact "otter-e2e-evidence" \
             --limit "Contract compatibility only. Reference releases are simulated by stub-registry: real directory layout, reference.yaml, manifest.json, and digest relationships, verified by the production reference verifier, but FASTA/GTF payloads and index files are placeholders. The Craftmake and build legs stop at 'plan'; no task executed and no scientific output exists. The Snakemake compatibility leg uses a stub 'snakemake --version' executable, so it proves Otter-side dispatch and planning, not execution. The install leg runs otter-install --dry-run only. Site profiles are exercised as a LOCAL profile under a work-local HOME: the default locator, list, validate, the overwrite guard, and the resolve-time reference-root handover all run, but SLURM cluster probing (sinfo, sacctmgr, srun compute-node checks) does not, so a generated slurm profile is only structurally validated. The build leg compares three authoring artifacts only; run snapshots are not compared because each embeds its own run directory and timestamp."
+
+  pr-brief:
+    name: Publish PR briefing
+    needs: e2e
+    if: >-
+      always() && github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download end-to-end evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: otter-e2e-evidence
+          path: evidence
+
+      - name: Read end-to-end stage counts
+        id: results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage_results="evidence/stage-results.tsv"
+          if [[ ! -f "${stage_results}" ]]; then
+            echo "passed=unavailable" >>"${GITHUB_OUTPUT}"
+            echo "failed=unavailable" >>"${GITHUB_OUTPUT}"
+            echo "total=unavailable" >>"${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          passed="$(awk -F'|' '$2=="pass" || $2=="expected-failure" {count++} END {print count+0}' "${stage_results}")"
+          failed="$(awk -F'|' '$2=="fail" || $2=="unexpected-pass" || $2=="wrong-error" {count++} END {print count+0}' "${stage_results}")"
+          total="$(awk -F'|' 'NR>1 {count++} END {print count+0}' "${stage_results}")"
+          echo "passed=${passed}" >>"${GITHUB_OUTPUT}"
+          echo "failed=${failed}" >>"${GITHUB_OUTPUT}"
+          echo "total=${total}" >>"${GITHUB_OUTPUT}"
+
+      - name: Create or update the end-to-end briefing
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          E2E_RESULT: ${{ needs.e2e.result }}
+          PASSED: ${{ steps.results.outputs.passed }}
+          FAILED: ${{ steps.results.outputs.failed }}
+          TOTAL: ${{ steps.results.outputs.total }}
+        with:
+          script: |
+            const marker = '<!-- otter-pr-brief:e2e -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const describe = (result) => ({
+              success: '✅ passed',
+              failure: '❌ failed',
+              cancelled: '⚪ cancelled',
+              skipped: '⚪ skipped',
+            }[result] ?? `⚠️ ${result}`);
+
+            const body = `${marker}
+            ## OTTER offline end-to-end briefing
+
+            | Check | Result |
+            |---|---|
+            | Offline rehearsal | ${describe(process.env.E2E_RESULT)} |
+            | Passing or expected-refusal stages | ${process.env.PASSED}/${process.env.TOTAL} |
+            | Failed or wrong-result stages | ${process.env.FAILED} |
+
+            The rehearsal covers RRBS, RNA-seq, BS-PDX, and RNA-PDX authoring, resolution, \`--dry-run\` planning, \`otter build\` equivalence, migration compatibility, and refusal guards. It uses a simulated reference registry: no genome is downloaded and no scientific workflow task executes.
+
+            [Open the evidence and logs](${runUrl}) · Artifact: \`otter-e2e-evidence\` · Commit \`${context.payload.pull_request.head.sha.slice(0, 7)}\`
+
+            _This comment is updated on each push, so the PR keeps one current end-to-end briefing._`;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

@@ -81,7 +81,7 @@ jobs:
             fi
             printf '%04d\t%s\t%s\t%s\n' "$artifact_index" "$(basename "$target_bam")" "$(basename "$target_bai")" "$mapped_reads" >> "$classification_summary"
           done
-          python - "$declaration_path" "$graft_directory" '${{ inputs.splicing_outcome }}' "$staging_splicing_directory" <<'PY'
+          python3 - "$declaration_path" "$graft_directory" '${{ inputs.splicing_outcome }}' "$staging_splicing_directory" <<'PY'
           import json
           import os
           import pathlib
@@ -213,7 +213,7 @@ jobs:
             local staged_directory="$1"
             local published_directory="$2"
             if [ -e "$published_directory" ]; then
-              python - "$staged_directory" "$published_directory" <<'PY'
+              python3 - "$staged_directory" "$published_directory" <<'PY'
           import hashlib
           import pathlib
           import sys
@@ -241,5 +241,6 @@ jobs:
 
           "$otter_cli" artifact publish '${{ paths.config }}' "$declaration_path"
           test -f "$manifest_path"
-          test "$(stat -c '%a' "$manifest_path")" = 444
+          manifest_mode="$(stat -c '%a' "$manifest_path" 2>/dev/null || stat -f '%Lp' "$manifest_path")"
+          test "$manifest_mode" = 444
           "$otter_cli" artifact verify '${{ paths.config }}'

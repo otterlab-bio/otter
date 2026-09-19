@@ -147,7 +147,7 @@ func printWorkflowStatusTo(output io.Writer, state *workflow.State) {
 			if step.Status == "running" {
 				fmt.Fprintf(output, "\nCurrently running: Step %d (%s)\n", step.Step, step.Name)
 				fmt.Fprintln(output, "To resume after interruption, use:")
-				fmt.Fprintln(output, "  otter run --config otter.yaml --resume")
+				fmt.Fprintln(output, "  otter run --config /absolute/project/runs/<run-id>/run.yaml --phase <phase> --resume")
 				break
 			}
 		}

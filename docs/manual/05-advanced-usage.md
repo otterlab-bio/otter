@@ -21,25 +21,9 @@ otter create \
 
 `create` verifies the release against the registry and locks its manifest digest,
 so the project never records a path that can drift. For PDX, name the roles
-separately with `--reference-graft` and `--reference-host`.
-
-The legacy track instead takes literal paths, because it predates the registry:
-
-```bash
-otter create --legacy \
-  --fastq ./fastq --mode RNASEQ --pdata ./samples.xlsx \
-  --species1 hg38 \
-  --genome1-fasta /refs/hg38.fa \
-  --genome1-index /refs/hg38/bismark \
-  --gtf1 /refs/hg38.gtf \
-  --star-index1 /refs/hg38/star \
-  --output my_project/userspace --jobid demo_rrbs
-```
-
-The `--species1`, `--genome1-*`, `--gtf1`, and `--star-index1` flags are
-**legacy-track only**. The canonical track accepts them without complaint and
-ignores them, so passing one alongside `--reference-primary` silently does
-nothing — check `project.yaml` if you are unsure which selection was recorded.
+separately with `--reference-graft` and `--reference-host`. There are no flags
+that take literal genome paths: a reference always enters a project as a locked
+registry release.
 
 ## FASTQ suffixes
 

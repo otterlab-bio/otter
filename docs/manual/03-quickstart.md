@@ -1,15 +1,13 @@
 # 3. Quick start
 
-Otter has two authoring tracks. They are marked on disk and refuse to mix:
+Otter authors canonical v1 projects, marked on disk by `project.lock.yaml`.
+Projects created by earlier releases on the legacy compatibility layout
+(marked by `.otter/assets.manifest.json`, with `config/otter.yaml` under
+`userspace/<jobid>/`) are still detected: authoring commands refuse them, and
+[migration](#migrating-a-legacy-project-to-v1) converts them into canonical
+projects.
 
-| Track | Marker | Executor | Config artifact |
-| --- | --- | --- | --- |
-| Canonical v1 (default) | `project.lock.yaml` | `craftmake` | `project.yaml` + `references.lock.yaml` |
-| Legacy compatibility (`--legacy`) | `.otter/assets.manifest.json` | `snakemake` | `config/otter.yaml` |
-
-Start with the canonical track. Use the legacy track only for an existing project that was already created that way, or when you need the established Snakemake compatibility path.
-
-## Canonical v1 track
+## Canonical v1 project
 
 ### 1. Initialize the project
 
@@ -180,33 +178,20 @@ overwritten. Authoring intent is not rewritten in place, because doing so would
 silently invalidate every snapshot already resolved from it; use
 `otter config resolve` to freeze a further run from the existing project.
 
-## Legacy compatibility track
+## Migrating a legacy project to v1
 
-Both commands must agree on the track, so pass `--legacy` to both.
+Otter no longer authors legacy projects, but a project created by an earlier
+release still carries `config/otter.yaml` under `userspace/<jobid>/`. That file
+is **not accepted by any executor**: running it means converting it to a
+canonical project.
 
-```bash
-otter init my_project --legacy
-
-otter create --legacy \
-  --fastq /data/fastq \
-  --mode RRBS \
-  --pdata /data/samples.xlsx \
-  --output my_project/userspace \
-  --jobid demo_rrbs
-```
-
-The generated configuration is `my_project/userspace/demo_rrbs/config/otter.yaml`, and reference paths are validated with existence checks against `inst/` rather than against a registry.
+Before migrating, the legacy file can be sanity-checked (`--schema auto` also
+detects it), and an old checkout's pinned assets can still be verified:
 
 ```bash
-otter assets verify --project my_project --strict
-otter config validate --config my_project/userspace/demo_rrbs/config/otter.yaml --schema legacy
+otter config validate --config old_project/userspace/demo_rrbs/config/otter.yaml --schema legacy
+otter assets verify --project old_project --strict
 ```
-
-### Migrating a legacy project to v1
-
-This track is authoring-only: `config/otter.yaml` is a compatibility artifact that
-**neither executor accepts**. Running it means converting it to a canonical
-project, which is also the path to leaving the legacy layout behind.
 
 `otter config migrate` converts the configuration into canonical project intent.
 Every reference must be named as `id@release`, because the legacy configuration
@@ -215,7 +200,7 @@ records filesystem paths rather than registry releases:
 ```bash
 otter init migrated
 otter config migrate \
-  --input my_project/userspace/demo_rrbs/config/otter.yaml \
+  --input old_project/userspace/demo_rrbs/config/otter.yaml \
   --output migrated/project.yaml \
   --reference-root "$OTTER_REFERENCE_ROOT" \
   --reference-primary hg38@GRCh38.p14

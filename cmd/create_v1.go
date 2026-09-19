@@ -30,11 +30,11 @@ type canonicalCreateRequest struct {
 	Adapter2       []string
 }
 
-// createScenarioForMode maps the legacy workflow mode onto a canonical scenario.
+// createScenarioForMode maps the workflow mode onto a canonical scenario.
 //
-// WGBS combined with a second species is rejected rather than guessed: there is
-// no WGBS-PDX scenario, and silently promoting it to BS-PDX would change the
-// meaning of the run.
+// WGBS combined with a PDX reference selection is rejected rather than guessed:
+// there is no WGBS-PDX scenario, and silently promoting it to BS-PDX would
+// change the meaning of the run.
 func createScenarioForMode(mode string, pdx bool) (configv1.Scenario, error) {
 	switch strings.ToUpper(strings.TrimSpace(mode)) {
 	case "RRBS":
@@ -182,7 +182,7 @@ func normalizedAdapter(adapter string) string {
 }
 
 // sampleGroupFromPData prefers the explicit group column, then the condition
-// column, matching the legacy group-level calculation.
+// column.
 func sampleGroupFromPData(pdata *input.PData, sampleID string) string {
 	if pdata == nil || pdata.Data == nil {
 		return ""
@@ -453,7 +453,6 @@ func defaultCanonicalProjectID(projectRoot string) string {
 // registerCanonicalCreateFlags registers the canonical authoring flags on the
 // create command.
 func registerCanonicalCreateFlags(command *cobra.Command) {
-	command.Flags().BoolVar(&createLegacyTrack, "legacy", false, "Write the legacy compatibility config/otter.yaml into --output/--jobid instead of a canonical v1 project")
 	command.Flags().String("reference-root", "", "Reference registry root for canonical projects (default: $OTTER_REFERENCE_ROOT or ~/.otter/references)")
 	command.Flags().String("reference-primary", "", "Primary reference as id@release for RRBS/WGBS/RNA-seq")
 	command.Flags().String("reference-graft", "", "Graft (primary) reference as id@release for BS-PDX/RNA-PDX")

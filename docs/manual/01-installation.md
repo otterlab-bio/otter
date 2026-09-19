@@ -4,7 +4,10 @@ This chapter covers release installation, source builds, runtime environments, a
 
 ## Requirements
 
-- Linux or macOS; Linux with SLURM is the primary production target.
+- Linux or macOS for source builds and local development; Linux with SLURM is
+  the primary production target. The umbrella `otter-install` release asset
+  shown below currently targets Linux; on macOS, use the source-build path
+  unless a matching platform asset is present in the selected release.
 - Git with recursive submodule support.
 - Go 1.24+ for the root and Go submodules.
 - Rust/Cargo for `enva`, `fastqcx`, `methx`, and `qctb`.
@@ -15,6 +18,10 @@ This chapter covers release installation, source builds, runtime environments, a
 
 The release installer is a statically compiled Go binary published to
 [`otterlab-bio/otter`](https://github.com/otterlab-bio/otter):
+
+The following command installs the Linux amd64 asset. For another Linux
+architecture, choose the matching release asset rather than renaming this
+binary.
 
 ```bash
 curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static

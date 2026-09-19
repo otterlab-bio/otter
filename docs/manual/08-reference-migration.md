@@ -1,44 +1,14 @@
 # 8. Reference Genome Migration Guide
 
-This chapter provides a guide and reference script for migrating legacy reference genome files (previously organized under `$beaverhome/inst/`) into the modern, immutable Otter Reference Registry (`$OTTER_REFERENCE_ROOT`).
+This chapter describes the supported compatibility procedure for moving an
+existing reference tree into the immutable Otter Reference Registry
+(`$OTTER_REFERENCE_ROOT`). The source layout is deployment-specific: supply its
+root explicitly with `--legacy-inst`, rather than relying on a historical
+installation path or directory convention.
 
 ---
 
-## 1. Background & Architecture Comparison
-
-In legacy Beaverflow/xdxtools deployments, reference genomes were stored in an ad-hoc directory structure inside each installation:
-
-```text
-# Legacy layout: $beaverhome/inst/
-$beaverhome/inst/
-├── hg19/
-│   ├── hg19_cpgIsland.bed
-│   ├── hg19_CpG_sites.gz
-│   └── hg19_CpG_sites.gz.tbi
-├── pdx/
-│   ├── homo_sapiens/
-│   │   ├── hg19.fasta
-│   │   ├── Bisulfite_Genome/
-│   │   └── chrs.txt
-│   └── mouse/
-│       ├── GRCm38.fasta
-│       ├── GRCm38.fasta.fai
-│       └── Bisulfite_Genome/
-└── rnaseq/
-    └── homo_sapiens/
-        ├── hg19.fasta
-        ├── hg19.ensGene.gtf
-        └── (STAR indexes: Genome, SA, SAindex, *.tab, *.txt)
-```
-
-**Limitations of the legacy structure**:
-- References were tied to local project paths or user home directories via hardcoded relative paths like `../../inst/pdx/homo_sapiens`.
-- No cryptographic manifests (`manifest.json`) or file checksums (`checksums.sha256`) existed to ensure reproducibility or detect bitrot.
-- Files were mutable and subject to accidental modification or overwriting.
-
----
-
-## 2. The Modern Reference Registry Contract
+## 1. The Reference Registry Contract
 
 In Otter, all reference genomes are managed centrally in an immutable registry outside project spaces:
 
@@ -74,12 +44,13 @@ $OTTER_REFERENCE_ROOT/
 
   The key is the reference **role** (`primary`, `secondary`, `graft`, `host`), not the
   reference id, and the digest field is `manifest_digest`. A release label is
-  mandatory and named `<assembly>-<annotation-source>-<annotation-version>`; the
-  layout and digest contract are defined in section 2 above.
+  mandatory; the naming convention `<assembly>-<annotation-source>-<annotation-version>`
+  is recommended but not enforced (the schema only requires `^[A-Za-z0-9._-]+$`).
+  The layout and digest contract are defined in this section.
 
 ---
 
-## 3. Migration Tool: `migrate_legacy_reference.sh`
+## 2. Migration Tool: `migrate_legacy_reference.sh`
 
 The repository provides an automated migration script: `scripts/migrate_legacy_reference.sh`.
 
@@ -98,7 +69,7 @@ The repository provides an automated migration script: `scripts/migrate_legacy_r
 
 ---
 
-## 4. Migration Execution
+## 3. Migration Execution
 
 ### Step 1: Environment Check
 
@@ -110,13 +81,14 @@ enva run otter-core -- bismark --version
 enva run otter-core -- bowtie2 --version
 ```
 
-> **Site note (Dedicated login/submit nodes)**: On clusters where compute or Slurm submission tools are only available from a designated gateway or submit node (for example, switching from `gangliamaster` to `login1` on the Hangzhou cluster via `ssh login1`), run the commands from that designated node.
-
 ### Step 2: Run Dry-Run Preview
 
 ```bash
+export LEGACY_INST=/path/to/legacy/inst
+export OTTER_REFERENCE_ROOT=/path/to/otter/references
+
 bash scripts/migrate_legacy_reference.sh \
-  --legacy-inst "$beaverhome/inst" \
+  --legacy-inst "$LEGACY_INST" \
   --registry-root "$OTTER_REFERENCE_ROOT" \
   --species hg19 \
   --dry-run
@@ -124,10 +96,10 @@ bash scripts/migrate_legacy_reference.sh \
 
 Expected output:
 ```text
-  [INFO]  Legacy inst root: /shared/beaverflow/inst
-  [INFO]  Target registry : /shared/otter/references
-  [INFO]  Source FASTA: .../inst/pdx/homo_sapiens/hg19.fasta (3.0G)
-  [INFO]  Source GTF  : .../inst/rnaseq/homo_sapiens/hg19.ensGene.gtf (448M)
+  [INFO]  Legacy inst root: /path/to/legacy/inst
+  [INFO]  Target registry : /path/to/otter/references
+  [INFO]  Source FASTA: <discovered source FASTA>
+  [INFO]  Source GTF  : <discovered source GTF>
   [INFO]  Target indexes: bismark,bowtie2,star
   ✓ Migration procedure completed.
 ```
@@ -139,7 +111,7 @@ When the legacy directory already contains pre-built Bismark or STAR indexes, `-
 
 ```bash
 bash scripts/migrate_legacy_reference.sh \
-  --legacy-inst "$beaverhome/inst" \
+  --legacy-inst "$LEGACY_INST" \
   --registry-root "$OTTER_REFERENCE_ROOT" \
   --species hg19 \
   --mode ingest
@@ -150,33 +122,21 @@ Rebuilds all indexes from the source FASTA and GTF using `otter reference build`
 
 ```bash
 bash scripts/migrate_legacy_reference.sh \
-  --legacy-inst "$beaverhome/inst" \
+  --legacy-inst "$LEGACY_INST" \
   --registry-root "$OTTER_REFERENCE_ROOT" \
   --species hg19 \
   --mode rebuild \
   --threads 16
 ```
 
-> **Site note (HPC Slurm batch submission)**: When rebuilding a large reference genome on an HPC cluster, submit the migration as a batch job so intensive indexing runs on an allocated compute node rather than a shared head node:
-> ```bash
-> sbatch -p <partition> -c 16 --mem=64G -J migrate_ref \
->   --wrap="bash scripts/migrate_legacy_reference.sh \
->     --legacy-inst '$beaverhome/inst' \
->     --registry-root '$OTTER_REFERENCE_ROOT' \
->     --species hg19 \
->     --mode rebuild \
->     --threads 16"
-> ```
-> *(For example, on the Hangzhou cluster this used `-p cpu112c` submitted from `login1`)*.
-
 ---
 
-## 5. Verifying the Migrated Reference Release
+## 4. Verifying the Migrated Reference Release
 
 After migration completes, verify the release with `otter reference`:
 
 ```bash
-export OTTER_REFERENCE_ROOT=/shared/otter/references
+export OTTER_REFERENCE_ROOT=/path/to/otter/references
 
 # Verify directory permissions (sealed read-only)
 ls -ld $OTTER_REFERENCE_ROOT/genomes/hg19/GRCh37.p13-gencode-v19
@@ -189,7 +149,7 @@ sha256sum -c checksums.sha256
 
 ---
 
-## 6. Project Locking
+## 5. Project Locking
 
 In your analysis project directory, record the reference release in `references.lock.yaml`:
 

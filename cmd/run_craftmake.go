@@ -330,13 +330,12 @@ func craftmakeSnapshotBoundaryError(configPath string, cause error) string {
 	if looksLikeLegacyOtterConfig(configPath) {
 		return fmt.Sprintf(
 			"%s; %s is a legacy compatibility configuration.\n"+
-				"Choose one:\n"+
-				"  - canonical:  otter config migrate --input %s --output project.yaml \\\n"+
-				"                  --reference-primary <id@release>\n"+
-				"                otter config resolve --project project.yaml --backend local\n"+
-				"                otter run --config runs/<run-id>/run.yaml --executor craftmake --phase step1\n"+
-				"  - legacy:     otter run --config %s --executor snakemake",
-			boundary, configPath, configPath, configPath)
+				"Migrate it to the canonical track first:\n"+
+				"  otter config migrate --input %s --output project.yaml \\\n"+
+				"    --reference-primary <id@release> --reference-root <registry>\n"+
+				"  otter config resolve --project project.yaml --backend local\n"+
+				"  otter run --config runs/<run-id>/run.yaml --executor snakemake",
+			boundary, configPath, configPath)
 	}
 	if selectedExecutor := snapshotExecutorValue(configPath); selectedExecutor != "" && selectedExecutor != runExecutorCraftmake {
 		return fmt.Sprintf(

@@ -338,8 +338,10 @@ print_completion_summary() {
   echo "$(txt "Quick start:" "快速开始：")"
   echo ""
   echo "    otter init my_project"
-  echo "    otter create --fastq /data/fastq --mode RRBS --pdata samples.csv --output my_project/userspace --jobid demo_rrbs"
-  echo "    otter run --config my_project/userspace/demo_rrbs/config/otter.yaml"
+  echo "    otter create --output my_project --fastq /data/fastq --mode RRBS --pdata samples.csv \\"
+  echo "      --reference-root <registry> --reference-primary <id@release>"
+  echo "    otter config resolve --project my_project/project.yaml --backend local"
+  echo "    otter run --config my_project/runs/<run-id>/run.yaml --executor craftmake --phase step1"
   echo ""
   divider
   echo ""

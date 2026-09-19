@@ -1,17 +1,28 @@
 package download
 
-import "testing"
+import (
+	"fmt"
+	"runtime"
+	"testing"
+)
 
 func TestAssetName(t *testing.T) {
+	arch := runtime.GOARCH
+	if arch == "x86_64" {
+		arch = "amd64"
+	}
+	if arch == "aarch64" {
+		arch = "arm64"
+	}
 	testCases := []struct {
 		assetStem string
 		linkage   string
 		expected  string
 	}{
-		{assetStem: "otter", linkage: "static", expected: "otter-linux-amd64-static"},
-		{assetStem: "enva", linkage: "static", expected: "enva-linux-amd64-static"},
-		{assetStem: "methx", linkage: "static", expected: "methx-linux-amd64-static"},
-		{assetStem: "otter", linkage: "dynamic", expected: "otter-linux-amd64"},
+		{assetStem: "otter", linkage: "static", expected: fmt.Sprintf("otter-linux-%s-static", arch)},
+		{assetStem: "enva", linkage: "static", expected: fmt.Sprintf("enva-linux-%s-static", arch)},
+		{assetStem: "methx", linkage: "static", expected: fmt.Sprintf("methx-linux-%s-static", arch)},
+		{assetStem: "otter", linkage: "dynamic", expected: fmt.Sprintf("otter-linux-%s", arch)},
 	}
 	for _, testCase := range testCases {
 		if actual := AssetName(testCase.assetStem, testCase.linkage); actual != testCase.expected {
