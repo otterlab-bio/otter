@@ -15,7 +15,7 @@ var (
 	verbose   bool
 
 	// buildVersion is the version of the binary
-	buildVersion = "1.2.0"
+	buildVersion = "1.2.1"
 	// buildCommit is the git commit hash
 	buildCommit = "unknown"
 	// buildDate is the build date

@@ -18,7 +18,7 @@ Options:
   --help             Show this help message
 
 Examples:
-  bash scripts/release.sh 1.2.0
+  bash scripts/release.sh 1.2.1
   bash scripts/release.sh 2026.03.23.1
   bash scripts/release.sh 2026.03.23.2 --no-daily-alias
 USAGE
