@@ -1,0 +1,7 @@
+OTTER project-authored source code and documentation are licensed under the
+MIT License in `LICENSE`.
+
+Third-party material retains its original copyright and licensing terms. In
+particular, `inst/.depress/yyds_functions.R` contains the Broad Institute/MIT
+copyright notice embedded by its original authors. The MIT License for OTTER
+does not alter that notice or grant rights to that third-party material.
