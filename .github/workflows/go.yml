@@ -29,6 +29,12 @@ jobs:
           go-version: '1.24'
           cache: true
 
+      # Deliberately before the test steps: a dependency whose tag was moved
+      # after publication makes every cold download fail its sumdb check, and a
+      # warm setup-go cache hides that for as long as the cache key is stable.
+      - name: Verify module checksums against a cold cache
+        run: bash scripts/ci/verify-module-checksums.sh
+
       - name: Verify toolchain consistency
         run: bash scripts/verify_toolchain_consistency.sh
 

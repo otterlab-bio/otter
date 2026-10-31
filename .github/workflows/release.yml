@@ -46,6 +46,9 @@ jobs:
         with:
           components: clippy
 
+      - name: Verify module checksums against a cold cache
+        run: bash scripts/ci/verify-module-checksums.sh
+
       - name: Test parent project
         run: go test -count=1 -short -buildvcs=false ./internal/... ./cmd/...
 
