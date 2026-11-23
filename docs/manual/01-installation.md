@@ -85,11 +85,15 @@ git submodule update --init holt
 docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
 ```
 
-`OTTER_VERSION` defaults to `latest`. Builds accept both `linux/amd64` and
-`linux/arm64` (`docker buildx build --platform ...`). Each tool is checked
-against the release's `checksums.txt` before it is installed, and the
-environment YAML files come from the same release, so binaries and runtime
-definitions cannot drift apart.
+`OTTER_VERSION` defaults to `latest`. Each tool is checked against the
+release's `checksums.txt` before it is installed, and the environment YAML
+files come from the same release, so binaries and runtime definitions cannot
+drift apart.
+
+The published image is `linux/amd64` only. Its base layer is built from
+`docker.io/library/archlinux`, which has no arm64 manifest, so an arm64 image
+cannot be assembled yet. On arm64 hosts, use the release binaries
+(`otter-install-linux-arm64-static`) or run the amd64 image under emulation.
 
 The image also contains SSH, JupyterLab with the Posit Ark kernel, and a
 pre-initialized `otter-core` environment created with `enva`; see
