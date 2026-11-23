@@ -57,22 +57,42 @@ otter → craftmake → enva → 算子 → bamdriver
 
 ### 安装 release
 
-发布安装器是发布到
-[`otterlab-bio/otter`](https://github.com/otterlab-bio/otter) 的静态编译 Go 二进制。
-下例使用 Linux amd64 资产；其他 Linux 架构请选择匹配的 release 资产。macOS
-支持从源码构建，但这里展示的 umbrella installer 是 Linux 资产：
-
-```bash
-curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static
-chmod +x otter-install
-./otter-install
-```
-
-旧的 shell 安装器仍保留用于兼容：
+shell 安装器会自动识别操作系统和架构，并下载匹配的 release 资产：
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/otterlab-bio/otter/main/scripts/install.sh)
 ```
+
+Release 为 Linux 和 macOS 的 amd64、arm64 都提供原生二进制。如需使用编译好的 Go
+安装器，从最新 release 下载对应平台的资产后执行：
+
+| 平台 | 资产 |
+| --- | --- |
+| Linux x86-64 / AArch64 | `otter-install-linux-amd64-static` / `otter-install-linux-arm64-static` |
+| macOS Intel / Apple Silicon | `otter-install-darwin-amd64` / `otter-install-darwin-arm64` |
+
+在 Intel macOS 上，安装器只安装二进制，因为锁定的 Bismark 环境没有 `osx-64` 构建。
+
+### 容器镜像
+
+`holt` 子仓库负责构建容器化工作台。它的 `holt-run` 镜像在构建时解析最新的稳定版 OTTER
+release，而不是写死版本，因此会自动跟随本仓库（并且每周重建一次，OTTER 发布新版本时还会
+通过 repository dispatch 立即触发）。
+
+```bash
+docker run --rm -it -p 2222:2222 ghcr.io/otterlab-bio/holt-run:latest otter --version
+```
+
+如需从源码构建可复现的镜像，可以显式固定版本：
+
+```bash
+git submodule update --init holt
+docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
+```
+
+镜像会用 release 自带的 `checksums.txt` 校验每个工具，资产损坏或不完整会直接让构建失败，
+而不是产出一个不可用的镜像。SSH、JupyterLab 和预置的 `otter-core` 运行时见
+[holt](https://github.com/otterlab-bio/holt)。
 
 ### 从源码构建
 
@@ -183,6 +203,7 @@ executor 属于 run snapshot，因此该选择不会写进 `project.yaml`，而�
 | `qctb` | 版本化 QC 汇总报告 | [otterlab-bio/qctb](https://github.com/otterlab-bio/qctb) |
 | `methx` | Bismark coverage 和甲基化 HDF5 处理 | [otterlab-bio/methx](https://github.com/otterlab-bio/methx) |
 | `bamdriver` | 共享纯 Go BAM/BGZF 库 | [otterlab-bio/bamdriver](https://github.com/otterlab-bio/bamdriver) |
+| `holt` | 跟随最新稳定版的容器化工作台 | [otterlab-bio/holt](https://github.com/otterlab-bio/holt) |
 
 历史源码符号和旧资产名称可能仍包含 `xdxtools`、`fastqc-rs`、`xenofilter-go`、`Paireads`、`htseq2matrix-go`、`gomats`、`methrix-cli` 或 `bamdriver-go`。这些名称只在兼容路径和历史证据中保留。
 

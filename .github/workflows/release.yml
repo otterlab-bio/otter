@@ -225,6 +225,7 @@ jobs:
             - Stable releases are built from immutable tags; the schedule and manual dispatch without a tag publish the daily prerelease.
             - Linux amd64 and arm64 assets are static musl or pure Go executables (`*-linux-*-static`).
             - macOS Intel and Apple Silicon assets use the system runtime (`*-darwin-*`).
+            - Container images are not built here; `holt` is a submodule and its `holt-run` image follows the newest stable release.
             - All platforms are built and smoke-tested natively before publishing. `bamdriver` is a Go library, not a standalone executable.
             - On macOS Intel, the installer installs binaries only: the pinned Bismark environment is not available for `osx-64`.
 
@@ -235,6 +236,27 @@ jobs:
             Or download the matching `otter-install` asset below and run `chmod +x otter-install && ./otter-install`.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ask the holt container repository to rebuild
+        # holt-run resolves the newest stable OTTER release at build time. A
+        # dispatch makes the image rebuild promptly after this release instead
+        # of waiting for its weekly schedule. Skipped when no PAT is configured.
+        env:
+          SUBMODULES_PAT: ${{ secrets.SUBMODULES_PAT }}
+          TAG: ${{ needs.metadata.outputs.tag }}
+        run: |
+          if [[ -z "${SUBMODULES_PAT}" ]]; then
+            echo "::notice::SUBMODULES_PAT is not configured; holt will pick up ${TAG} on its weekly rebuild."
+            exit 0
+          fi
+          payload="$(printf '{"event_type":"otter-release","client_payload":{"tag":"%s"}}' "${TAG}")"
+          if ! curl -fsS -X POST \
+            -H "Authorization: Bearer ${SUBMODULES_PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/otterlab-bio/holt/dispatches \
+            -d "${payload}"; then
+            echo "::warning::Could not dispatch to otterlab-bio/holt; the weekly rebuild still picks up ${TAG}."
+          fi
 
       - name: Check public release mirror configuration
         id: public_release_config

@@ -91,22 +91,46 @@ while `craftmake`, the native Go execution layer, is integrated and validated al
 
 ### Install a release
 
-The release installer is a statically compiled Go binary published alongside the umbrella's
-own releases. This example targets Linux amd64; use a matching published asset
-for another Linux architecture. macOS source builds are supported, but the
-umbrella installer asset shown here is Linux-only:
-
-```bash
-curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static
-chmod +x otter-install
-./otter-install
-```
-
-The legacy shell installer remains available for compatibility:
+The shell installer detects your operating system and architecture, then downloads the
+matching release assets:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/otterlab-bio/otter/main/scripts/install.sh)
 ```
+
+Releases ship native binaries for Linux and macOS on both amd64 and arm64. To use the
+compiled Go installer instead, download the asset for your platform from the latest release
+and run it:
+
+| Host | Asset |
+| --- | --- |
+| Linux x86-64 / AArch64 | `otter-install-linux-amd64-static` / `otter-install-linux-arm64-static` |
+| macOS Intel / Apple Silicon | `otter-install-darwin-amd64` / `otter-install-darwin-arm64` |
+
+On Intel macOS the installer installs binaries only, because the pinned Bismark
+environment has no `osx-64` build.
+
+### Container image
+
+The `holt` submodule builds the containerized workbench. Its `holt-run` image follows the newest
+stable OTTER release at build time instead of pinning a version, so it tracks this repository
+automatically (and is rebuilt weekly, plus on each OTTER release through a repository dispatch).
+
+```bash
+docker run --rm -it -p 2222:2222 ghcr.io/otterlab-bio/holt-run:latest otter --version
+```
+
+To build a reproducible image from a checkout, pin the release explicitly:
+
+```bash
+git submodule update --init holt
+docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
+```
+
+The image installs every tool from the release's published `checksums.txt`, so a corrupted or
+partial asset fails the build instead of producing a broken image. See
+[holt](https://github.com/otterlab-bio/holt) for SSH, JupyterLab, and the pre-initialized
+`otter-core` runtime.
 
 ### Build from source
 
@@ -255,6 +279,7 @@ root that already carries the pinned workflow assets. See
 | `qctb` | Versioned QC summary reporting | [otterlab-bio/qctb](https://github.com/otterlab-bio/qctb) |
 | `methx` | Bismark coverage and methylation HDF5 processing | [otterlab-bio/methx](https://github.com/otterlab-bio/methx) |
 | `bamdriver` | Shared pure-Go BAM/BGZF library | [otterlab-bio/bamdriver](https://github.com/otterlab-bio/bamdriver) |
+| `holt` | Containerized workbench that follows the newest stable release | [otterlab-bio/holt](https://github.com/otterlab-bio/holt) |
 
 > The links above follow the public repository naming contract. Historical source symbols and old asset names may still contain `xdxtools`, `fastqc-rs`, `xenofilter-go`, `Paireads`, `htseq2matrix-go`, `gomats`, `methrix-cli`, or `bamdriver-go`; those names are retained only where compatibility or historical evidence requires them.
 
