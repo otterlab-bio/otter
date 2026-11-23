@@ -128,7 +128,9 @@ docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
 ```
 
 The image installs every tool from the release's published `checksums.txt`, so a corrupted or
-partial asset fails the build instead of producing a broken image. See
+partial asset fails the build instead of producing a broken image. It is published for
+`linux/amd64` only: the Arch Linux base image has no arm64 manifest yet, so on arm64 hosts use
+the release binaries instead. See
 [holt](https://github.com/otterlab-bio/holt) for SSH, JupyterLab, and the pre-initialized
 `otter-core` runtime.
 
