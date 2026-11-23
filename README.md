@@ -129,10 +129,9 @@ docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
 
 The image installs every tool from the release's published `checksums.txt`, so a corrupted or
 partial asset fails the build instead of producing a broken image. It is published for
-`linux/amd64` only: the Arch Linux base image has no arm64 manifest yet, so on arm64 hosts use
-the release binaries instead. The holt repository still verifies arm64 continuously by building
-an unpublished image on a native arm64 runner and running the whole toolchain plus `otter-core`
-there. See
+**`linux/amd64` and `linux/arm64`**: both architectures are built on native runners and combined
+into one multi-architecture manifest, and each is verified with the full toolchain plus
+`otter-core`. See
 [holt](https://github.com/otterlab-bio/holt) for SSH, JupyterLab, and the pre-initialized
 `otter-core` runtime.
 
