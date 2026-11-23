@@ -266,6 +266,21 @@ root that already carries the pinned workflow assets. See
 - [Schemas](docs/schema/) — configuration and manifest schemas.
 - [Methx → native Methrix HDF5 exporter](methx/scripts/export_methrix_hdf5.R) — R-side interoperability path.
 
+## Citation
+
+If you use OTTER in your research, please cite the bioRxiv preprint (DOI: [10.64898/2026.10.24.761506](https://doi.org/10.64898/2026.10.24.761506)).
+
+```bibtex
+@article{zheng2026otter,
+  author  = {Zheng, Yanhua and Liu, Xin and Yi, Yingyu and Sun, Xiaojun and Liu, Fang and Yan, Xiaojing and Man, Cheuk-Him and Gu, Hongcang and Wang, Xiaoxue and Zhang, Fan},
+  title   = {{OTTER}: Orchestrated Transcriptomic, Tumor-xenograft ({PDX/CDX}), and Epigenomic Reporting Workflow},
+  journal = {bioRxiv},
+  year    = {2026},
+  doi     = {10.64898/2026.10.24.761506},
+  url     = {https://doi.org/10.64898/2026.10.24.761506}
+}
+```
+
 ## Development
 
 ```bash
