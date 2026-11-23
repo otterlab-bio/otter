@@ -92,8 +92,9 @@ docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
 
 镜像会用 release 自带的 `checksums.txt` 校验每个工具，资产损坏或不完整会直接让构建失败，
 而不是产出一个不可用的镜像。镜像目前只发布 `linux/amd64`：基础镜像 Arch Linux 尚无 arm64
-manifest，arm64 主机请直接使用 release 二进制。SSH、JupyterLab 和预置的 `otter-core`
-运行时见 [holt](https://github.com/otterlab-bio/holt)。
+manifest，arm64 主机请直接使用 release 二进制。holt 仓库仍会持续验证 arm64：在原生 arm64
+runner 上构建一个不发布的镜像，并在其中运行整套工具和 `otter-core`。SSH、JupyterLab 和
+预置的 `otter-core` 运行时见 [holt](https://github.com/otterlab-bio/holt)。
 
 ### 从源码构建
 
