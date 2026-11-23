@@ -84,4 +84,15 @@ if [ "${#missing_install[@]}" -gt 0 ] || [ "${#missing_build[@]}" -gt 0 ]; then
   exit 1
 fi
 
+# The release tag drives -ldflags, but these fallbacks are what a plain
+# `go build` or `make` reports, so they must agree with each other.
+root_version="$(sed -n 's/^[[:space:]]*buildVersion = "\([^"]*\)".*/\1/p' "${ROOT_DIR}/cmd/root.go")"
+installer_version="$(sed -n 's/^[[:space:]]*version = "\([^"]*\)".*/\1/p' "${ROOT_DIR}/installer/main.go")"
+makefile_version="$(sed -n 's/^VERSION ?= //p' "${ROOT_DIR}/installer/Makefile")"
+if [ -z "${root_version}" ] || [ "${root_version}" != "${installer_version}" ] || [ "${root_version}" != "${makefile_version}" ]; then
+  echo "Version drift: cmd/root.go=${root_version:-missing} installer/main.go=${installer_version:-missing} installer/Makefile=${makefile_version:-missing}" >&2
+  exit 1
+fi
+echo "Version fallbacks agree: ${root_version}"
+
 echo "Toolchain consistency check passed."
