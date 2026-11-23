@@ -4,36 +4,39 @@ This chapter covers release installation, source builds, runtime environments, a
 
 ## Requirements
 
-- Linux or macOS for source builds and local development; Linux with SLURM is
-  the primary production target. The umbrella `otter-install` release asset
-  shown below currently targets Linux; on macOS, use the source-build path
-  unless a matching platform asset is present in the selected release.
-- Git with recursive submodule support.
-- Go 1.24+ for the root and Go submodules.
-- Rust/Cargo for `enva`, `fastqcx`, `methx`, and `qctb`.
-- `methx` release binaries include the HDF5 runtime through static linking; HDF5 environment variables are not required at runtime.
-- Source builds of `methx` require the Rust toolchain and native build tools used by `hdf5-metno`.
+- Linux or macOS on amd64 (x86-64) or arm64 (AArch64/Apple Silicon). Linux with
+  SLURM remains the primary production target.
+- For source builds: recursive Git submodules, Go 1.26.3 or newer for the full
+  toolchain, and stable Rust/Cargo with native C/CMake tools for the Rust CLIs.
+  The umbrella Go module alone declares Go 1.24.
 
 ## Release installation
 
-The release installer is a statically compiled Go binary published to
-[`otterlab-bio/otter`](https://github.com/otterlab-bio/otter):
+The [OTTER releases](https://github.com/otterlab-bio/otter/releases) built by the
+four-platform workflow use these names for the Go installer. The other tools
+have the same platform suffixes.
 
-The following command installs the Linux amd64 asset. For another Linux
-architecture, choose the matching release asset rather than renaming this
-binary.
+| Host | Installer asset | Linkage |
+| --- | --- | --- |
+| Linux x86-64 | `otter-install-linux-amd64-static` | Static |
+| Linux AArch64 | `otter-install-linux-arm64-static` | Static |
+| macOS Intel | `otter-install-darwin-amd64` | macOS system libraries |
+| macOS Apple Silicon | `otter-install-darwin-arm64` | macOS system libraries |
 
-```bash
-curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/latest/download/otter-install-linux-amd64-static
-chmod +x otter-install
-./otter-install
-```
-
-The legacy shell installer remains available for compatibility:
+The shell installer detects your platform and selects matching binaries:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/otterlab-bio/otter/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/otterlab-bio/otter/main/scripts/install.sh) --skip-envs
 ```
+
+Alternatively, download the matching Go installer asset from a release, make it
+executable, and run it. Both installers accept `--version TAG` to select one
+release. Older releases may not have binaries for your platform. Without a tag,
+the installers look for a published release with the matching tool assets,
+including daily prereleases. Use `--skip-envs` to install binaries without
+creating the optional environment setup. On Intel macOS, both installers skip
+environment setup automatically: the pinned Bismark package has no `osx-64`
+build. This does not prevent installing or running the native OTTER tools.
 
 After installation, verify the selected binary and asset set rather than assuming the latest pre-release is production-qualified:
 
@@ -104,12 +107,23 @@ Not every operator exposes `--version`; use `--help` for those tools.
 
 ## HDF5 build environment
 
-Release binaries include HDF5 statically and do not require HDF5 runtime variables. When compiling `methx` from source, install the native build tools and let `hdf5-metno` build its dependency:
+`methx` release binaries link HDF5 statically on both operating systems; installing
+HDF5 separately is not required. For source builds, install CMake plus a C
+compiler (e.g. `build-essential` on Linux or Xcode Command Line Tools on macOS),
+then run `cargo build --locked --release --features download` inside `methx`.
+The release build uses a native musl compiler on Linux to keep libc static too.
 
-```bash
-sudo apt-get install -y build-essential cmake pkg-config
-cargo build --release
-```
+## Build and release checks
+
+The **Build Toolchain Platforms** GitHub workflow builds `otter`, `otter-install`,
+`craftmake`, `matsrun`, `pairbam`, `seq2mat`, `xenofilx`, `enva`, `fastqcx`, `methx`,
+and `qctb` on native runners for all four platforms. It builds `bamdriver` as a
+Go library; there is no `bamdriver` binary to download. Each component repository
+also has a native build workflow. The umbrella release workflow publishes the
+combined assets, checksums and manifest only after all four jobs pass. The checks
+cover binary format, architecture, CLI startup, Linux static linkage and the
+installer's offline plan; they do not run full scientific workflows or assert
+third-party package availability on every operating system.
 
 
 ## Compatibility note

@@ -4,29 +4,23 @@ set -euo pipefail
 
 DIST_DIR="${1:-dist}"
 
-required=(
-  otter-linux-amd64-static
-  otter-install-linux-amd64-static
-  craftmake-linux-amd64-static
-  enva-linux-amd64-static
-  xenofilx-linux-amd64-static
-  pairbam-linux-amd64-static
-  seq2mat-linux-amd64-static
-  matsrun-linux-amd64-static
-  qctb-linux-amd64-static
-  fastqcx-linux-amd64-static
-  methx-linux-amd64-static
-)
-
-if [[ "${DIST_DIR}" == "--print-required" ]]; then
-  printf '%s\n' "${required[@]}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/release-platform.sh"
+platform="${2:-linux-amd64}" # Preserve the legacy evidence scripts' default.
+if [[ "$platform" == all ]]; then
+  names="$(for target in "${release_platforms[@]}"; do release_assets "$target"; done)"
+else
+  names="$(release_assets "$platform")"
+fi
+if [[ "$DIST_DIR" == --print-required ]]; then
+  printf '%s\n' "$names"
   exit 0
 fi
 
 missing=()
 not_exec=()
 
-for artifact in "${required[@]}"; do
+while IFS= read -r artifact; do
   path="${DIST_DIR}/${artifact}"
   if [ ! -f "$path" ]; then
     echo "✗ missing: $artifact"
@@ -39,7 +33,7 @@ for artifact in "${required[@]}"; do
     continue
   fi
   echo "✓ $artifact"
-done
+done <<< "$names"
 
 if [ ${#missing[@]} -gt 0 ] || [ ${#not_exec[@]} -gt 0 ]; then
   [ ${#missing[@]} -gt 0 ] && echo "Missing artifacts: ${missing[*]}"

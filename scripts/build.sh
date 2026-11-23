@@ -1,41 +1,26 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-VERSION=${1:-"dev"}
-COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-LDFLAGS="-s -w -X github.com/otterlab-bio/otter/cmd.buildVersion=${VERSION}"
-LDFLAGS="$LDFLAGS -X github.com/otterlab-bio/otter/cmd.buildCommit=${COMMIT}"
-LDFLAGS="$LDFLAGS -X github.com/otterlab-bio/otter/cmd.buildDate=${DATE}"
-
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/release-platform.sh"
+cd "$ROOT"
+VERSION="${1:-dev}"
+COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+LDFLAGS="-s -w -X github.com/otterlab-bio/otter/cmd.buildVersion=$VERSION"
+LDFLAGS="$LDFLAGS -X github.com/otterlab-bio/otter/cmd.buildCommit=$COMMIT -X github.com/otterlab-bio/otter/cmd.buildDate=$DATE"
 mkdir -p dist
-
-# 构建函数
-build() {
-    local goos=$1
-    local goarch=$2
-    local ext=""
-
-    [ "$goos" = "windows" ] && ext=".exe"
-
-    local output="dist/otter-${VERSION}-${goos}-${goarch}${ext}"
-    echo "Building for ${goos}/${goarch}..."
-
-    CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build \
-        -trimpath \
-        -ldflags="$LDFLAGS" \
-        -o "$output" \
-        .
-
-    # 生成校验和
-    if [ "$goos" = "linux" ]; then
-        sha256sum "$output" >> dist/checksums.txt
-    fi
-}
-
-# 构建所有平台
-build linux amd64
-
-echo "Build complete! Output in dist/"
-ls -lh dist/
+outputs=()
+for platform in "${release_platforms[@]}"; do
+    output="otter-$VERSION-$platform"
+    echo "Building $platform..."
+    CGO_ENABLED=0 GOOS="${platform%-*}" GOARCH="${platform#*-}" go build \
+        -mod=readonly -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o "dist/$output" .
+    outputs+=("$output")
+done
+(cd dist && if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${outputs[@]}"
+else
+    shasum -a 256 "${outputs[@]}"
+fi > checksums.txt)
+echo 'Build complete! Output in dist/'

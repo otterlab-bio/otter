@@ -89,7 +89,7 @@ echo "Running release checks..."
 bash scripts/verify_release_evidence.sh
 go test ./...
 go vet ./...
-./scripts/build.sh "$VERSION"
+bash scripts/build.sh "$VERSION"
 
 echo "Creating tag ${TAG}..."
 git tag -a "$TAG" -m "Release ${TAG}"

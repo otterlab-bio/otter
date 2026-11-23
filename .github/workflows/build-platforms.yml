@@ -1,0 +1,90 @@
+name: Build Toolchain Platforms
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+  workflow_dispatch:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and smoke test (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-amd64
+            runner: ubuntu-24.04
+            rust-target: x86_64-unknown-linux-musl
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            rust-target: aarch64-unknown-linux-musl
+          - platform: darwin-amd64
+            runner: macos-15-intel
+            rust-target: x86_64-apple-darwin
+          - platform: darwin-arm64
+            runner: macos-15
+            rust-target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          # Craftmake requires Go 1.26.3; the umbrella module by itself requires 1.24.
+          go-version: '1.26.3'
+          cache-dependency-path: '**/go.sum'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+      - name: Install musl and native build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential musl-tools cmake binutils
+      - name: Build all tools
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/otter-cargo
+          VERSION: ${{ inputs.version || '0.0.0-ci' }}
+        run: bash scripts/build-platform-release.sh "$PLATFORM" "$VERSION" dist
+      - name: Test installer and run native binaries
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          (cd installer && go test ./...)
+          bash scripts/ci/test-shell-installer-platforms.sh
+          bash scripts/ci/smoke-release-platform.sh dist "$PLATFORM"
+      - name: Verify Linux static linkage
+        if: runner.os == 'Linux'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: bash scripts/verify_static_linkage.sh dist "$RUNNER_TEMP/linkage" "$PLATFORM"
+      - name: Upload linkage evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linkage-${{ matrix.platform }}
+          path: ${{ runner.temp }}/linkage/
+          if-no-files-found: ignore
+      - name: Archive executables with mode bits
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: tar -czf "$RUNNER_TEMP/bundle-$PLATFORM.tar.gz" -C dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-${{ matrix.platform }}
+          path: ${{ runner.temp }}/bundle-${{ matrix.platform }}.tar.gz
+          if-no-files-found: error

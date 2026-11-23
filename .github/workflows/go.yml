@@ -26,7 +26,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26.3'
           cache: true
 
       # Deliberately before the test steps: a dependency whose tag was moved
@@ -88,74 +88,13 @@ jobs:
             --check "bamdriver submodule tests|pass|see step log|-" \
             --check "pairbam submodule tests|pass|see step log|-" \
             --check "xenofilx tests, race gate, govulncheck|pass|see step log|-" \
-            --metric "Go toolchain|1.24 (pinned by setup-go)" \
+            --metric "Go toolchain|1.26.3 (pinned by setup-go)" \
             --limit "Unit and integration tests over the checked-out tree, including submodules at this commit. This is the compile-and-test gate, not the real-BAM Gate A-D evidence." \
             --note "All submodules are public, so they are checked out without a token."
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    # 仅构建 Linux amd64
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          cache: true
-
-      - name: Build binary
-        env:
-          CGO_ENABLED: 0
-          VERSION: ${{ github.ref_name }}
-          COMMIT: ${{ github.sha }}
-          DATE: ${{ github.event.head_commit.timestamp }}
-        run: |
-          VERSION=${VERSION#refs/tags/}
-          VERSION=${VERSION//\//-}
-          LDFLAGS="-s -w -X github.com/otterlab-bio/otter/cmd.buildVersion=${VERSION#v} -X github.com/otterlab-bio/otter/cmd.buildCommit=${COMMIT:0:7} -X github.com/otterlab-bio/otter/cmd.buildDate=${DATE}"
-
-          # 静态链接构建（适用于CentOS等低版本GLIBC环境）
-          go build -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o otter-linux-amd64-static .
-
-          # 动态链接构建（常规Linux）
-          go build -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o otter-linux-amd64 .
-
-          # 重命名产物
-          mv otter-linux-amd64 otter-${VERSION#v}-linux-amd64
-          mv otter-linux-amd64-static otter-${VERSION#v}-linux-amd64-static
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-amd64
-          path: otter-*
-          retention-days: 7
-
-      - name: Job summary
-        if: always()
-        continue-on-error: true
-        run: |
-          ls -l otter-* 2>/dev/null || true
-          bash scripts/ci/job-summary.sh \
-            --verdict "${{ job.status }}" \
-            --title "OTTER — Go CI/CD build" \
-            --checked "Builds the Linux amd64 OTTER binary in both link modes and uploads them as the linux-amd64 artifact." \
-            --check "Static build (low-glibc targets)|otter-<sanitized-version>-linux-amd64-static produced|see artifact|-" \
-            --check "Dynamic build (regular Linux)|otter-<sanitized-version>-linux-amd64 produced|see artifact|-" \
-            --metric "Target|linux/amd64 only" \
-            --metric "Link modes|static and dynamic" \
-            --artifact "linux-amd64" \
-            --limit "Compiled binaries only. Static-linkage verification of release artifacts is asserted by the Release Binaries workflow, not here."
-
   pr-brief:
     name: Publish PR briefing
-    needs: [test, build]
+    needs: test
     if: >-
       always() && github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
@@ -167,7 +106,6 @@ jobs:
         uses: actions/github-script@v7
         env:
           TEST_RESULT: ${{ needs.test.result }}
-          BUILD_RESULT: ${{ needs.build.result }}
         with:
           script: |
             const marker = '<!-- otter-pr-brief:go-ci -->';
@@ -185,9 +123,8 @@ jobs:
             | Gate | Result |
             |---|---|
             | Go tests, vet, and umbrella build | ${describe(process.env.TEST_RESULT)} |
-            | Linux amd64 static and dynamic builds | ${describe(process.env.BUILD_RESULT)} |
 
-            The test gate also runs the bamdriver, pairbam, and xenofilx suites, including xenofilx's short race gate and \`govulncheck\`. The build outputs are available as the \`linux-amd64\` artifact when the build succeeds.
+            The test gate also runs the bamdriver, pairbam, and xenofilx suites, including xenofilx's short race gate and \`govulncheck\`. The separate Build Toolchain Platforms workflow builds and checks the four release platforms.
 
             [Open this CI run](${runUrl}) · Commit \`${context.payload.pull_request.head.sha.slice(0, 7)}\`
 

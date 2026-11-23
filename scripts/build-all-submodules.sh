@@ -91,10 +91,6 @@ build_go() {
   local ldflags
 
   echo "Building ${name}..."
-  if [ "${dir}" = "seq2mat" ]; then
-    bash scripts/ensure_seq2mat_entrypoint.sh "${dir}"
-  fi
-
   version_value="$(git -C "${dir}" describe --tags --abbrev=7 --dirty 2>/dev/null || true)"
   if [[ "${version_value}" =~ ^v?([0-9]+\.[0-9]+\.[0-9]+)(.*)$ ]]; then
     version_value="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
@@ -105,7 +101,7 @@ build_go() {
 
   (
     cd "${dir}"
-    "${GO_CMD[@]}" build -ldflags "${ldflags}" -o "${CARGO_BIN}/${binary}" "${main_pkg}"
+    CGO_ENABLED=0 "${GO_CMD[@]}" build -mod=readonly -ldflags "${ldflags}" -o "${CARGO_BIN}/${binary}" "${main_pkg}"
   )
   echo "  ✓ Installed to ${CARGO_BIN}/${binary} (version: ${version_value})"
   echo ""
@@ -116,7 +112,7 @@ build_rust() {
   local dir="$2"
   local binary="$3"
   local source_binary="${4:-$3}"
-  local cargo_args=()
+  local cargo_args=(build --release --locked --bin "$source_binary")
 
   if [ "${dir}" = "methx" ]; then
     cargo_args+=(--features download)
@@ -125,14 +121,17 @@ build_rust() {
   echo "Building ${name}..."
   (
     cd "${dir}"
-    "${RUST_CMD[@]}" build --release "${cargo_args[@]}"
-    cp "target/release/${source_binary}" "${CARGO_BIN}/${binary}"
+    "${RUST_CMD[@]}" "${cargo_args[@]}"
+    cp "${CARGO_TARGET_DIR:-target}/release/${source_binary}" "${CARGO_BIN}/${binary}"
   )
   echo "  ✓ Installed to ${CARGO_BIN}/${binary}"
   echo ""
 }
 
-# Go projects
+# Go projects. bamdriver is a library used by several tools.
+(cd bamdriver && CGO_ENABLED=0 "${GO_CMD[@]}" build -mod=readonly ./...)
+build_go "craftmake" "craftmake" "craftmake" "./cmd/craftmake" "main.version"
+"${CARGO_BIN}/craftmake" --version
 build_go "xenofilx" "xenofilx" "xenofilx" "./cmd/xenofilx" "github.com/otterlab-bio/xenofilx/pkg/cli.Version"
 build_go "pairbam" "pairbam" "pairbam" "./cmd/pairbam" "main.Version"
 build_go "seq2mat" "seq2mat" "seq2mat" "./cmd/seq2mat" "main.Version"
