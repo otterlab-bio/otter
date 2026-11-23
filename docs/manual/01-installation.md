@@ -90,16 +90,11 @@ release's `checksums.txt` before it is installed, and the environment YAML
 files come from the same release, so binaries and runtime definitions cannot
 drift apart.
 
-The published image is `linux/amd64` only. Its base layer is built from
-`docker.io/library/archlinux`, which has no arm64 manifest, so an arm64 image
-cannot be assembled yet. On arm64 hosts, use the release binaries
-(`otter-install-linux-arm64-static`) or run the amd64 image under emulation.
-
-arm64 is still exercised continuously: the holt repository's **Verify arm64
-container** workflow builds an `arm64` verification image on a native
-`ubuntu-24.04-arm` runner, runs all ten tools, and creates `otter-core` with
-`enva` (samtools, Bismark, Bowtie2, STAR, FastQC, seqkit, rMATS all execute on
-aarch64). That image is never published.
+The image is published for **`linux/amd64` and `linux/arm64`**. Both are built
+from one multi-architecture base (`menci/archlinuxarm`, which maps amd64 to
+ordinary Arch Linux and arm64 to Arch Linux ARM) on native runners, then
+combined into a single manifest. Each architecture is smoke-tested with the
+full toolchain and a created `otter-core` before publication.
 
 The image also contains SSH, JupyterLab with the Posit Ark kernel, and a
 pre-initialized `otter-core` environment created with `enva`; see

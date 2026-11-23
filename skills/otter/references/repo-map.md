@@ -47,7 +47,7 @@ directory before `workflows/`.
 | `methx` | Rust | Bismark-to-custom-HDF5 methylation processor; native Methrix interoperability is provided by `scripts/export_methrix_hdf5.R` | The task is about methylation processing, CpG extraction, QC, or Methrix export |
 | `qctb` | Rust | QC summary reporting CLI for sequencing workflows | The task is about QC summary generation or replacing legacy R QC scripts |
 | `fastqcx` | Rust | FASTQ QC report generator with HTML and MultiQC summary output | The task is about raw FASTQ QC metrics, HTML reports, or summary file generation |
-| `holt` | Docker | Containerized workbench (`holt-build` base + `holt-run` image). `holt-run` resolves the newest stable OTTER release at build time, verifies each asset against the release `checksums.txt`, and is published for linux/amd64 only (the archlinux base image has no arm64 manifest); a separate unpublishable verification workflow builds and runs an arm64 image on ubuntu-24.04-arm | The task is about container images, the `holt-run` Dockerfile, or packaged environments |
+| `holt` | Docker | Containerized workbench (`holt-build` base + `holt-run` image). `holt-run` resolves the newest stable OTTER release at build time, verifies each asset against the release `checksums.txt`, and is published for linux/amd64 and linux/arm64 from one menci/archlinuxarm base, each architecture built and verified natively before the multi-arch manifest is assembled | The task is about container images, the `holt-run` Dockerfile, or packaged environments |
 
 ## Cross-repo guidance
 
