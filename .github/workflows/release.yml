@@ -17,7 +17,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -39,12 +39,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26.3'
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Verify module checksums against a cold cache
         run: bash scripts/ci/verify-module-checksums.sh
@@ -91,56 +91,14 @@ jobs:
             --check "methx fmt, clippy -D warnings, tests|all pass|see step log|-" \
             --limit "A gate on the release, not a release itself: no artifact is produced here. xenofilx runs the short suite by design to keep release latency bounded."
 
-  build-and-release:
-    needs: test
-    runs-on: ubuntu-latest
-    env:
-      # The public-mirror step below force-pushes HEAD onto this repo's
-      # PUBLIC_RELEASES_BRANCH. Leaving it empty disables that step: install.sh is already
-      # served from the umbrella repository itself, so no separate mirror is needed, and
-      # pointing the mirror at the umbrella would force-push over its own main branch.
-      PUBLIC_RELEASES_REPO: ""
-      PUBLIC_RELEASES_BRANCH: main
-      INSTALLER_RELEASES_REPO: otterlab-bio/otter
-
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      needs_tag_push: ${{ steps.meta.outputs.needs_tag_push }}
     steps:
-      - name: Checkout with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          cache: true
-
-      - name: Verify toolchain consistency
-        run: bash scripts/verify_toolchain_consistency.sh
-
-      - name: Verify release evidence (if committed)
-        run: |
-          if [[ -f docs/review/release_evidence_latest.env ]]; then
-            bash scripts/verify_release_evidence.sh
-          else
-            echo "No committed release evidence manifest found; skipping release evidence verification in CI."
-          fi
-
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Add musl target
-        run: rustup target add x86_64-unknown-linux-musl
-
-      - name: Install system dependencies (musl + cmake for HDF5 static)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y musl-tools cmake
-
-      - name: Create dist directory
-        run: mkdir -p dist
-
       - name: Resolve release metadata
         id: meta
         env:
@@ -159,6 +117,10 @@ jobs:
             NEEDS_TAG_PUSH=true
           fi
 
+          if [[ ! "$TAG" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|daily-[0-9]{8})$ ]]; then
+            echo "Invalid release tag: $TAG" >&2
+            exit 1
+          fi
           VERSION="${TAG#v}"
           if [[ "$TAG" == daily-* ]]; then
             PRERELEASE=true
@@ -176,132 +138,57 @@ jobs:
           echo "Resolved release tag: $TAG"
           echo "Build version: $VERSION"
 
-      - name: Build otter static
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-          COMMIT: ${{ github.sha }}
-        run: |
-          VER="${VERSION#v}"
-          LDFLAGS="-s -w -X github.com/otterlab-bio/otter/cmd.buildVersion=${VER} -X github.com/otterlab-bio/otter/cmd.buildCommit=${COMMIT:0:7}"
-          CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o dist/otter-linux-amd64-static .
-          echo "✓ otter-linux-amd64-static"
+  build:
+    needs: metadata
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      version: ${{ needs.metadata.outputs.version }}
 
-      - name: Build otter-install static
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-          COMMIT: ${{ github.sha }}
-        run: |
-          VER="${VERSION#v}"
-          LDFLAGS="-s -w -X main.version=${VER} -X main.commit=${COMMIT:0:7}"
-          (cd installer && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="$LDFLAGS" -o ../dist/otter-install-linux-amd64-static .)
-          echo "✓ otter-install-linux-amd64-static"
+  build-and-release:
+    needs: [metadata, test, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      # Leave empty unless there is a distinct, explicitly configured public mirror.
+      PUBLIC_RELEASES_REPO: ""
+      PUBLIC_RELEASES_BRANCH: main
 
-      - name: Build Go submodules static
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          VER="${VERSION#v}"
-          bash scripts/ensure_seq2mat_entrypoint.sh seq2mat
-
-          build_go_submodule() {
-            local dir="$1" out="$2" pkg="$3" sym="$4"
-            local ld="-s -w"
-            if [ -n "$sym" ]; then
-              ld="$ld -X $sym=$VER"
-            fi
-            echo "Building $dir -> $out"
-            (cd "$dir" && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="$ld" -o "../dist/$out" "$pkg")
-            echo "✓ $out"
-          }
-
-          build_go_submodule craftmake craftmake-linux-amd64-static ./cmd/craftmake ""
-          build_go_submodule xenofilx xenofilx-linux-amd64-static ./cmd/xenofilx github.com/otterlab-bio/xenofilx/pkg/cli.Version
-          build_go_submodule pairbam pairbam-linux-amd64-static ./cmd/pairbam main.Version
-          build_go_submodule seq2mat seq2mat-linux-amd64-static ./cmd/seq2mat main.Version
-          build_go_submodule matsrun matsrun-linux-amd64-static ./cmd/matsrun github.com/otterlab-bio/matsrun/pkg/cli.Version
-
-      - name: Build Rust static binaries (enva/qctb/fastqcx)
-        run: |
-          (cd enva && cargo build --release --target x86_64-unknown-linux-musl)
-          cp enva/target/x86_64-unknown-linux-musl/release/enva dist/enva-linux-amd64-static
-          echo "✓ enva-linux-amd64-static"
-
-          (cd qctb && cargo build --release --target x86_64-unknown-linux-musl)
-          cp qctb/target/x86_64-unknown-linux-musl/release/qctb dist/qctb-linux-amd64-static
-          echo "✓ qctb-linux-amd64-static"
-
-          (cd fastqcx && cargo build --release --target x86_64-unknown-linux-musl)
-          cp fastqcx/target/x86_64-unknown-linux-musl/release/fastqcx dist/fastqcx-linux-amd64-static
-          echo "✓ fastqcx-linux-amd64-static"
-
-      - name: Build methx (static HDF5 via CMake, musl target)
-        run: |
-          (cd methx && cargo build --release --target x86_64-unknown-linux-musl --features download)
-          if [ -f methx/target/x86_64-unknown-linux-musl/release/methx ]; then
-            cp methx/target/x86_64-unknown-linux-musl/release/methx dist/methx-linux-amd64-static
-          else
-            echo "methx binary not found" >&2
-            exit 1
-          fi
-          echo "✓ methx-linux-amd64-static"
-
-      - name: Verify required release artifacts (strict)
-        run: bash scripts/verify_release_artifacts.sh dist
-
-      - name: Verify static linkage with ldd
-        if: always()
-        run: bash scripts/verify_static_linkage.sh dist "$RUNNER_TEMP/release-verification"
-
-      - name: Upload static linkage report
-        if: always()
-        uses: actions/upload-artifact@v4
+    steps:
+      - name: Checkout release source with submodules
+        uses: actions/checkout@v4
         with:
-          name: release-static-linkage-report
-          path: ${{ runner.temp }}/release-verification/
-          if-no-files-found: warn
-          retention-days: 90
-
-      - name: Verify tool versions
-        run: bash scripts/verify_versions.sh dist
-
-      - name: Stage environment YAML assets
-        run: cp inst/envs/*.yaml dist/
-
-      - name: Generate metadata and checksums
-        env:
-          TAG: ${{ steps.meta.outputs.tag }}
-          COMMIT: ${{ github.sha }}
+          submodules: recursive
+          fetch-depth: 0
+      - name: Verify toolchain consistency
+        run: bash scripts/verify_toolchain_consistency.sh
+      - name: Verify release evidence (if committed)
         run: |
-          cd dist
-          sha256sum * > checksums.txt
-          cat > manifest.json <<EOF2
-          {
-            "tag": "${TAG}",
-            "commit": "${COMMIT}",
-            "generated_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "artifacts": [
-              {"name":"otter-linux-amd64-static","linkage":"static"},
-              {"name":"otter-install-linux-amd64-static","linkage":"static"},
-              {"name":"craftmake-linux-amd64-static","linkage":"static"},
-              {"name":"enva-linux-amd64-static","linkage":"static"},
-              {"name":"xenofilx-linux-amd64-static","linkage":"static"},
-              {"name":"pairbam-linux-amd64-static","linkage":"static"},
-              {"name":"seq2mat-linux-amd64-static","linkage":"static"},
-              {"name":"matsrun-linux-amd64-static","linkage":"static"},
-              {"name":"qctb-linux-amd64-static","linkage":"static"},
-              {"name":"fastqcx-linux-amd64-static","linkage":"static"},
-              {"name":"methx-linux-amd64-static","linkage":"static"},
-              {"name":"otter-core.yaml","kind":"env_yaml"},
-              {"name":"otter-snakemake.yaml","kind":"env_yaml"},
-              {"name":"otter-extra.yaml","kind":"env_yaml"}
-            ]
-          }
-          EOF2
+          if [[ -f docs/review/release_evidence_latest.env ]]; then
+            bash scripts/verify_release_evidence.sh
+          fi
+      - name: Download verified platform bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: platform-*
+          path: platform-bundles
+      - name: Assemble and verify complete release payload
+        env:
+          TAG: ${{ needs.metadata.outputs.tag }}
+        run: |
+          mkdir -p dist
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            tar -xzf "platform-bundles/platform-$platform/bundle-$platform.tar.gz" -C dist
+          done
+          bash scripts/verify_release_artifacts.sh dist all
+          cp inst/envs/*.yaml dist/
+          python3 scripts/ci/release-metadata.py dist "$TAG" "$GITHUB_SHA"
+          (cd dist && sha256sum --check checksums.txt)
 
       - name: Create or update release tag
-        if: steps.meta.outputs.needs_tag_push == 'true'
+        if: needs.metadata.outputs.needs_tag_push == 'true'
         env:
-          TAG: ${{ steps.meta.outputs.tag }}
+          TAG: ${{ needs.metadata.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
@@ -323,7 +210,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.metadata.outputs.tag }}
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
@@ -331,33 +218,21 @@ jobs:
           # releases/latest ignores drafts, so the documented install URL 404s until someone
           # publishes it by hand — and a later run of this workflow puts it back.
           draft: false
-          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          prerelease: ${{ needs.metadata.outputs.prerelease == 'true' }}
           body: |
             ## Release Model
 
-            - Trigger: push of immutable release tags (`vX.Y.Z` or `vYYYY.MM.DD.N`), push to `main`, or manual dispatch
-            - Immutable tags: archival release points that must never move
-            - Daily aliases: same-day convenience tags that may be force-updated to the latest build for that UTC date
-            - Auto mode: the daily schedule and manual dispatch without a tag publish/update `daily-YYYYMMDD`
-            - Policy: strict artifact completeness (missing required binaries => release fails)
-
-            ## Linkage
-
-            - Fully static: `otter`, `otter-install`, `craftmake`, `enva`, `xenofilx`, `pairbam`, `seq2mat`, `matsrun`, `qctb`, `fastqcx`, `methx`
-
-            ## Installation
+            - Stable releases are built from immutable tags; the schedule and manual dispatch without a tag publish the daily prerelease.
+            - Linux amd64 and arm64 assets are static musl or pure Go executables (`*-linux-*-static`).
+            - macOS Intel and Apple Silicon assets use the system runtime (`*-darwin-*`).
+            - All platforms are built and smoke-tested natively before publishing. `bamdriver` is a Go library, not a standalone executable.
+            - On macOS Intel, the installer installs binaries only: the pinned Bismark environment is not available for `osx-64`.
 
             ```bash
             bash <(curl -fsSL https://raw.githubusercontent.com/otterlab-bio/otter/main/scripts/install.sh)
             ```
 
-            Or download the statically compiled Go installer:
-
-            ```bash
-            curl -fsSL -o otter-install https://github.com/otterlab-bio/otter/releases/download/${TAG}/otter-install-linux-amd64-static
-            chmod +x otter-install
-            ./otter-install
-            ```
+            Or download the matching `otter-install` asset below and run `chmod +x otter-install && ./otter-install`.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -382,7 +257,7 @@ jobs:
       - name: Prepare public release mirror refs
         if: steps.public_release_config.outputs.enabled == 'true'
         env:
-          TAG: ${{ steps.meta.outputs.tag }}
+          TAG: ${{ needs.metadata.outputs.tag }}
           PUBLIC_RELEASES_PAT: ${{ secrets.SUBMODULES_PAT }}
         run: |
           tmp_dir="$(mktemp -d)"
@@ -449,13 +324,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           repository: ${{ env.PUBLIC_RELEASES_REPO }}
-          tag_name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.metadata.outputs.tag }}
           target_commitish: ${{ env.PUBLIC_RELEASES_BRANCH }}
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
           draft: false
-          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          prerelease: ${{ needs.metadata.outputs.prerelease == 'true' }}
           body: |
             ## Public Mirror
 
@@ -472,35 +347,7 @@ jobs:
 
       - name: Job summary
         if: always()
-        continue-on-error: true
+        env:
+          TAG: ${{ needs.metadata.outputs.tag }}
         run: |
-          linkage_report="${RUNNER_TEMP}/release-verification/static-linkage.tsv"
-          artifact_count="0"
-          dist_size="-"
-          if [[ -d dist ]]; then
-            artifact_count="$(find dist -maxdepth 1 -type f | wc -l | tr -d ' ')"
-            dist_size="$(du -sh dist 2>/dev/null | cut -f1)"
-          fi
-          verified_count="-"
-          linkage_failures="-"
-          if [[ -f "${linkage_report}" ]]; then
-            verified_count="$(awk -F'\t' 'NR>1' "${linkage_report}" | wc -l | tr -d ' ')"
-            linkage_failures="$(awk -F'\t' 'NR>1 && $6 != "PASS"' "${linkage_report}" | wc -l | tr -d ' ')"
-          fi
-          bash scripts/ci/job-summary.sh \
-            --verdict "${{ job.status }}" \
-            --title "OTTER — Release Binaries" \
-            --scope "${{ steps.meta.outputs.tag || 'tag unresolved' }}" \
-            --checked "Builds every member as a static Linux amd64 binary, verifies the required artifact set, asserts static linkage with ldd, pins tool versions, and publishes the release plus the public mirror." \
-            --check "Required release artifacts|verify_release_artifacts.sh passes|see step log|-" \
-            --check "Static linkage per artifact|all verified artifacts static|${verified_count} verified / ${linkage_failures} failed|-" \
-            --check "Tool versions|verify_versions.sh passes|see step log|-" \
-            --check "Release + public mirror published|tag and release created|see step log|-" \
-            --metric "Release tag|${{ steps.meta.outputs.tag || 'unresolved' }}" \
-            --metric "Version|${{ steps.meta.outputs.version || 'unresolved' }}" \
-            --metric "Prerelease|${{ steps.meta.outputs.prerelease || 'unresolved' }}" \
-            --metric "Dist files|${artifact_count}" \
-            --metric "Dist size|${dist_size}" \
-            --artifact "release-static-linkage-report" \
-            --limit "Static linkage is verified with ldd on the build host. It is not a runtime execution test on a low-glibc target; the static builds exist for that compatibility, and only the toolchain consistency check constrains the compilers used." \
-            --note "The detailed per-artifact ldd table is emitted by scripts/verify_static_linkage.sh into its own step summary above."
+          bash scripts/ci/job-summary.sh             --verdict "${{ job.status }}"             --title "OTTER — Release Binaries"             --scope "$TAG"             --checked "The Linux and macOS amd64/arm64 builds must pass format and native startup checks, plus Linux static-linkage checks, before all four bundles can be published together."             --check "Release payload|all four platform bundles plus environment YAML, manifest and checksums|see release assets|-"             --limit "Native startup checks do not assert availability of third-party conda packages or perform full workflow runs."

@@ -195,6 +195,21 @@ executor 属于 run snapshot，因此该选择不会写进 `project.yaml`，而�
 - [离线 e2e 演练](scripts/e2e/otter_e2e.sh)：在无网络环境下驱动真实二进制，验证 authoring、build、site、配对和迁移契约。
 - [Methx → 原生 Methrix HDF5 转换函数](methx/scripts/export_methrix_hdf5.R)
 
+## 引用
+
+如果你在研究中使用了 OTTER，请引用 bioRxiv 预印本（DOI：[10.64898/2026.10.24.761506](https://doi.org/10.64898/2026.10.24.761506)）。
+
+```bibtex
+@article{zheng2026otter,
+  author  = {Zheng, Yanhua and Liu, Xin and Yi, Yingyu and Sun, Xiaojun and Liu, Fang and Yan, Xiaojing and Man, Cheuk-Him and Gu, Hongcang and Wang, Xiaoxue and Zhang, Fan},
+  title   = {{OTTER}: Orchestrated Transcriptomic, Tumor-xenograft ({PDX/CDX}), and Epigenomic Reporting Workflow},
+  journal = {bioRxiv},
+  year    = {2026},
+  doi     = {10.64898/2026.10.24.761506},
+  url     = {https://doi.org/10.64898/2026.10.24.761506}
+}
+```
+
 ## 开发
 
 ```bash

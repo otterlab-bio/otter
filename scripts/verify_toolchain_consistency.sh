@@ -30,14 +30,15 @@ for cmd in "${KNOWN_EXTERNAL_CMDS[@]}"; do
   fi
 done
 
-mapfile -t install_bins < <(
+install_bins=()
+while IFS= read -r bin; do install_bins+=("$bin"); done < <(
   awk '/^TOOLS=\(/,/^\)/ { print }' "${INSTALL_SCRIPT}" \
     | grep -Eo '"[^"]+"' \
-    | tr -d '"' \
-    | cut -d: -f1
+    | tr -d '"'
 )
 
-mapfile -t build_bins < <(
+build_bins=()
+while IFS= read -r bin; do build_bins+=("$bin"); done < <(
   grep -E "required_bins=\(" "${BUILD_SCRIPT}" \
     | sed -E 's/.*\((.*)\).*/\1/' \
     | tr ' ' '\n' \

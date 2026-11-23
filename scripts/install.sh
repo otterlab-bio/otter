@@ -55,17 +55,18 @@ RELEASE_METADATA_TAG=""
 RELEASE_METADATA_REPO=""
 ACTIVE_RELEASES_REPO=""
 
-# All 9 tools: binary_name:release_asset_stem:linkage(static|dynamic)
+# Mandatory release binaries (bamdriver is a library, not an executable).
 TOOLS=(
-  "otter:otter:static"
-  "enva:enva:static"
-  "xenofilx:xenofilx:static"
-  "pairbam:pairbam:static"
-  "seq2mat:seq2mat:static"
-  "methx:methx:static"
-  "qctb:qctb:static"
-  "fastqcx:fastqcx:static"
-  "matsrun:matsrun:static"
+  "otter"
+  "craftmake"
+  "enva"
+  "xenofilx"
+  "pairbam"
+  "seq2mat"
+  "methx"
+  "qctb"
+  "fastqcx"
+  "matsrun"
 )
 
 # Conda environment yaml files
@@ -85,7 +86,7 @@ INSTALL_ENVS_CHOICE="all"   # all | core | snakemake | extra
 GITHUB_TOKEN_PROMPT_ATTEMPTED=false
 BINARY_OVERWRITE_DECISION=""
 BINARY_OVERWRITE_PROMPT_SHOWN=false
-declare -A DOWNLOAD_RESUME_ELIGIBLE=()
+DOWNLOAD_RESUME_ELIGIBLE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -374,25 +375,25 @@ github_api_get() {
 github_release_download() {
   local url="$1" dest="$2" tmp_dest="${2}.part" status=0
 
-  if [ -f "$tmp_dest" ] && [ -s "$tmp_dest" ] && [ -z "${DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]:-}" ]; then
+  if [ -f "$tmp_dest" ] && [ -s "$tmp_dest" ] && [ "$DOWNLOAD_RESUME_ELIGIBLE" != "$tmp_dest" ]; then
     log_info "$(txt "Ignoring stale partial download for $(basename "$dest"); restarting from scratch" "忽略 $(basename "$dest") 的历史残留部分下载；将从头重新下载")"
     rm -f "$tmp_dest"
   fi
 
-  if [ -f "$tmp_dest" ] && [ -s "$tmp_dest" ] && [ -n "${DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]:-}" ]; then
+  if [ -f "$tmp_dest" ] && [ -s "$tmp_dest" ] && [ "$DOWNLOAD_RESUME_ELIGIBLE" = "$tmp_dest" ]; then
     log_info "$(txt "Resuming partial download for $(basename "$dest") ..." "正在续传 $(basename "$dest") 的部分下载 ...")"
     if [ -n "$GITHUB_AUTH_TOKEN" ] && [[ "$url" == https://api.github.com/repos/*/releases/assets/* ]]; then
       if curl --retry 3 --retry-all-errors --connect-timeout 15 -fL -C - --progress-bar         -H "Accept: application/octet-stream"         -H "Authorization: Bearer $GITHUB_AUTH_TOKEN"         -H "X-GitHub-Api-Version: 2022-11-28"         "$url" -o "$tmp_dest"; then
-        mv -f "$tmp_dest" "$dest"
-        unset "DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]"
+        mv -f "$tmp_dest" "$dest" || return
+        DOWNLOAD_RESUME_ELIGIBLE=""
         return 0
       else
         status=$?
       fi
     else
       if curl_github_unauth "$url" --retry 3 --retry-all-errors --connect-timeout 15 -fL -C - --progress-bar -o "$tmp_dest"; then
-        mv -f "$tmp_dest" "$dest"
-        unset "DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]"
+        mv -f "$tmp_dest" "$dest" || return
+        DOWNLOAD_RESUME_ELIGIBLE=""
         return 0
       else
         status=$?
@@ -400,35 +401,39 @@ github_release_download() {
     fi
 
     if [ "$status" -ne 33 ]; then
-      DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]=1
+      DOWNLOAD_RESUME_ELIGIBLE="$tmp_dest"
       return "$status"
     fi
 
     log_warn "$(txt "Server does not support resume for $(basename "$dest"); restarting download from scratch" "服务器不支持 $(basename "$dest") 的续传；将从头重新下载")"
     rm -f "$tmp_dest"
-    unset "DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]"
+    DOWNLOAD_RESUME_ELIGIBLE=""
   fi
 
   if [ -n "$GITHUB_AUTH_TOKEN" ] && [[ "$url" == https://api.github.com/repos/*/releases/assets/* ]]; then
-    if ! curl --retry 3 --retry-all-errors --connect-timeout 15 -fL --progress-bar       -H "Accept: application/octet-stream"       -H "Authorization: Bearer $GITHUB_AUTH_TOKEN"       -H "X-GitHub-Api-Version: 2022-11-28"       "$url" -o "$tmp_dest"; then
+    if curl --retry 3 --retry-all-errors --connect-timeout 15 -fL --progress-bar       -H "Accept: application/octet-stream"       -H "Authorization: Bearer $GITHUB_AUTH_TOKEN"       -H "X-GitHub-Api-Version: 2022-11-28"       "$url" -o "$tmp_dest"; then
+      :
+    else
       status=$?
       if [ -f "$tmp_dest" ] && [ -s "$tmp_dest" ]; then
-        DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]=1
+        DOWNLOAD_RESUME_ELIGIBLE="$tmp_dest"
       fi
       return "$status"
     fi
   else
-    if ! curl_github_unauth "$url" --retry 3 --retry-all-errors --connect-timeout 15 -fL --progress-bar -o "$tmp_dest"; then
+    if curl_github_unauth "$url" --retry 3 --retry-all-errors --connect-timeout 15 -fL --progress-bar -o "$tmp_dest"; then
+      :
+    else
       status=$?
       if [ -f "$tmp_dest" ] && [ -s "$tmp_dest" ]; then
-        DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]=1
+        DOWNLOAD_RESUME_ELIGIBLE="$tmp_dest"
       fi
       return "$status"
     fi
   fi
 
-  mv -f "$tmp_dest" "$dest"
-  unset "DOWNLOAD_RESUME_ELIGIBLE[$tmp_dest]"
+  mv -f "$tmp_dest" "$dest" || return
+  DOWNLOAD_RESUME_ELIGIBLE=""
 }
 
 resolve_latest_release_tag_via_page() {
@@ -452,12 +457,40 @@ release_tag_exists_via_page() {
 }
 
 resolve_latest_release_tag() {
-  local repo="$1" tag=""
-  if tag="$(github_api_get "https://api.github.com/repos/${repo}/releases?per_page=20" | awk -F'"' '/"tag_name"/ && tag == "" { tag = $4 } END { if (tag != "") print tag }' 2>/dev/null)" && [ -n "$tag" ]; then
-    printf '%s\n' "$tag"
-    return 0
+  local repo="$1" tag listing tags
+  if listing="$(github_api_get "https://api.github.com/repos/${repo}/releases?per_page=20")"; then
+    tags="$(printf '%s\n' "$listing" | awk -F'"' '/"tag_name"/ { print $4 }')"
+    while IFS= read -r tag; do
+      [ -n "$tag" ] || continue
+      if try_get_release_metadata "$repo" "$tag" && release_has_platform_assets; then
+        printf '%s\n' "$tag"
+        return 0
+      fi
+    done <<< "$tags"
+    return 1
   fi
-  resolve_latest_release_tag_via_page "$repo"
+  tag="$(resolve_latest_release_tag_via_page "$repo")" || return 1
+  [ -n "$tag" ] || return 1
+  if try_get_release_metadata "$repo" "$tag" && ! release_has_platform_assets; then
+    return 1
+  fi
+  printf '%s\n' "$tag"
+}
+
+release_asset_name() {
+  printf '%s-%s-%s%s\n' "$1" "$OS_NAME" "$ARCH" "$LINKAGE_SUFFIX"
+}
+
+release_has_platform_assets() {
+  local tool asset asset_names
+  # GitHub emits one property per line; match complete name values, not prefixes.
+  asset_names="$(printf '%s\n' "$RELEASE_METADATA" | awk -F'"' '/^[[:space:]]*"name"[[:space:]]*:/ { print $4 }')"
+  for tool in "${TOOLS[@]}"; do
+    asset="$(release_asset_name "$tool")"
+    if ! grep -Fxq "$asset" <<< "$asset_names"; then
+      return 1
+    fi
+  done
 }
 
 build_release_repo_candidates() {
@@ -511,10 +544,13 @@ select_release_repo_for_tag() {
 
   while IFS= read -r repo; do
     [ -n "$repo" ] || continue
-    if try_get_release_metadata "$repo" "$tag" || release_tag_exists_via_page "$repo" "$tag"; then
-      ACTIVE_RELEASES_REPO="$repo"
-      return 0
+    if try_get_release_metadata "$repo" "$tag"; then
+      release_has_platform_assets || continue
+    elif ! release_tag_exists_via_page "$repo" "$tag"; then
+      continue
     fi
+    ACTIVE_RELEASES_REPO="$repo"
+    return 0
   done < <(build_release_repo_candidates)
 
   return 1
@@ -1013,17 +1049,28 @@ if [ -n "$GITHUB_AUTH_TOKEN" ]; then
   log_success "$(txt "GitHub token detected – authenticated release access enabled" "已检测到 GitHub token，启用认证下载")"
 fi
 
-# Architecture detection
+# Detect the release platform before selecting a version or making requests.
+OS_NAME=$(uname -s)
+case "$OS_NAME" in
+  Linux)  OS_NAME=linux; LINKAGE_SUFFIX=-static ;;
+  Darwin) OS_NAME=darwin; LINKAGE_SUFFIX='' ;;
+  *) log_error "Unsupported operating system: $OS_NAME (expected Linux or macOS)"; exit 1 ;;
+esac
 ARCH=$(uname -m)
 case "$ARCH" in
-  x86_64)  ARCH="amd64" ;;
-  aarch64) ARCH="arm64" ;;
-  *)
-    log_error "$(txt "Unsupported architecture: $ARCH" "不支持的架构: $ARCH")"
-    exit 1
-    ;;
+  x86_64|amd64)  ARCH=amd64 ;;
+  aarch64|arm64) ARCH=arm64 ;;
+  *) log_error "Unsupported architecture: $ARCH (expected amd64 or arm64)"; exit 1 ;;
 esac
-log_success "$(txt "Architecture: $ARCH" "系统架构: $ARCH")"
+if [ "$OS_NAME" = darwin ] && [ "$ARCH" = amd64 ]; then
+  if [ "$(/usr/sbin/sysctl -in sysctl.proc_translated 2>/dev/null || true)" = 1 ]; then
+    ARCH=arm64
+  elif [ "$SKIP_ENVS" = false ]; then
+    log_warn "macOS Intel: installing binaries only; the pinned Bismark environment is unavailable on osx-64."
+    SKIP_ENVS=true
+  fi
+fi
+log_success "$(txt "Platform: $OS_NAME/$ARCH" "系统平台: $OS_NAME/$ARCH")"
 
 USER_HOME="$(resolve_user_home 2>/dev/null || printf '%s\n' "${HOME:-}")"
 DEFAULT_INSTALL_DIR="${USER_HOME}/.cargo/bin"
@@ -1111,7 +1158,10 @@ echo -e "${BOLD}$(txt "Step 3: Downloading binaries" "Step 3: 下载二进制文
 
 # Resolve release tag and source repo via GitHub API
 ACTIVE_RELEASES_REPO=""
-if [ "$OTTER_VERSION" = "latest" ]; then
+if [ "$DRY_RUN" = true ] && [ "$OTTER_VERSION" != latest ]; then
+  # Match the Go installer: a pinned dry run is fully offline.
+  ACTIVE_RELEASES_REPO="$RELEASES_REPO"
+elif [ "$OTTER_VERSION" = "latest" ]; then
   log_info "$(txt "Querying GitHub API for latest release..." "正在查询 GitHub API 获取最新版本...")"
   latest_release_tag=""
   while IFS= read -r candidate_repo; do
@@ -1146,7 +1196,7 @@ if [ -z "$ACTIVE_RELEASES_REPO" ] && maybe_prompt_github_token_on_failure "$(txt
   fi
 fi
 if [ -z "$ACTIVE_RELEASES_REPO" ]; then
-  log_error "$(txt "Could not find the requested release in any configured release repo. Adjust --releases-repo / --fallback-releases-repo or use a different version." "无法在已配置的 release 仓库中找到指定版本。请调整 --releases-repo / --fallback-releases-repo，或使用其他版本。")"
+  log_error "$(txt "Could not find the requested release with binaries for $OS_NAME/$ARCH in any configured release repo. Adjust --releases-repo / --fallback-releases-repo or use a different version." "无法在已配置的 release 仓库中找到指定版本。请调整 --releases-repo / --fallback-releases-repo，或使用其他版本。")"
   exit 1
 fi
 
@@ -1157,17 +1207,13 @@ run "mkdir -p \"$INSTALL_DIR\""
 
 BASE_URL="https://github.com/${ACTIVE_RELEASES_REPO}/releases/download/${OTTER_VERSION}"
 
-for entry in "${TOOLS[@]}"; do
-  IFS=':' read -r bin_name asset_stem linkage <<< "$entry"
-  asset="${asset_stem}-linux-${ARCH}"
-  if [ "${linkage}" = "static" ]; then
-    asset="${asset}-static"
-  fi
+for bin_name in "${TOOLS[@]}"; do
+  asset="$(release_asset_name "$bin_name")"
   dest="${INSTALL_DIR}/${bin_name}"
 
 
   url="${BASE_URL}/${asset}"
-  if [ -n "$GITHUB_AUTH_TOKEN" ]; then
+  if [ "$DRY_RUN" = false ] && [ -n "$GITHUB_AUTH_TOKEN" ]; then
     asset_api_url="$(resolve_release_asset_api_url "$ACTIVE_RELEASES_REPO" "$OTTER_VERSION" "$asset" || true)"
     if [ -n "$asset_api_url" ]; then
       url="$asset_api_url"
@@ -1207,10 +1253,12 @@ for entry in "${TOOLS[@]}"; do
         chmod +x "$dest"
         log_success "$(txt "$bin_name installed" "$bin_name 安装完成")"
       else
-        log_warn "$(txt "$bin_name download failed (HTTP error – asset may not exist for this release, or authentication is required)" "$bin_name 下载失败（HTTP 错误：该版本可能不存在该资产，或需要认证）")"
+        log_error "Download failed: ${asset} (${OTTER_VERSION})"
+        exit 1
       fi
     else
-      log_warn "$(txt "$bin_name download failed (HTTP error – asset may not exist for this release, or authentication is required)" "$bin_name 下载失败（HTTP 错误：该版本可能不存在该资产，或需要认证）")"
+      log_error "Download failed: ${asset} (${OTTER_VERSION})"
+      exit 1
     fi
   fi
 done
@@ -1223,8 +1271,7 @@ echo -e "${BOLD}$(txt "Step 4: Verifying installed tools" "Step 4: 验证已安�
 # Temporarily add INSTALL_DIR to PATH for verification
 export PATH="${INSTALL_DIR}:${PATH}"
 
-for entry in "${TOOLS[@]}"; do
-  bin_name="${entry%%:*}"
+for bin_name in "${TOOLS[@]}"; do
   dest="${INSTALL_DIR}/${bin_name}"
 
   if [ "$DRY_RUN" = true ]; then
@@ -1232,11 +1279,11 @@ for entry in "${TOOLS[@]}"; do
     continue
   fi
 
-  if [ -f "$dest" ]; then
-    ver=$("$dest" --version 2>&1 | head -1 || echo "(version unknown)")
-    log_success "$bin_name  $ver"
+  if [ -x "$dest" ] && ver=$("$dest" --version 2>&1); then
+    log_success "$bin_name  $(printf '%s\n' "$ver" | sed -n '1p')"
   else
-    log_warn "$(txt "$bin_name not found at $dest" "$bin_name 未在 $dest 找到")"
+    log_error "Could not execute $dest --version for $OS_NAME/$ARCH"
+    exit 1
   fi
 done
 
@@ -1282,27 +1329,13 @@ if [ "$SKIP_ENVS" = false ]; then
     run_conda_cache_clean
   fi
 
-  declare -A ENV_SELECT
-  case "$INSTALL_ENVS_CHOICE" in
-    all)
-      for f in "${ENV_FILES[@]}"; do ENV_SELECT["$f"]=1; done
-      ;;
-    core)
-      ENV_SELECT["otter-core.yaml"]=1
-      ;;
-    snakemake)
-      ENV_SELECT["otter-core.yaml"]=1
-      ENV_SELECT["otter-snakemake.yaml"]=1
-      ;;
-    extra)
-      for f in "${ENV_FILES[@]}"; do ENV_SELECT["$f"]=1; done
-      ;;
-  esac
-
   enva_clean_cache_pending=true
 
   for yaml_file in "${ENV_FILES[@]}"; do
-    [ -z "${ENV_SELECT[$yaml_file]+x}" ] && continue
+    case "$INSTALL_ENVS_CHOICE:$yaml_file" in
+      core:otter-core.yaml|snakemake:otter-core.yaml|snakemake:otter-snakemake.yaml|all:*|extra:*) ;;
+      *) continue ;;
+    esac
     env_name="${yaml_file%.yaml}"
     yaml_path="${ACTIVE_ENVS_DIR}/${yaml_file}"
 

@@ -11,28 +11,10 @@ import (
 	"strings"
 )
 
-// Tool describes a release asset to download and install.
-type Tool struct {
-	// Name is the installed binary name.
-	Name string
-	// AssetStem is the release asset stem before the platform suffix.
-	AssetStem string
-	// Linkage is "static" or "dynamic".
-	Linkage string
-}
-
 // Tools is the canonical set of binaries the installer manages.
-var Tools = []Tool{
-	{Name: "otter", AssetStem: "otter", Linkage: "static"},
-	{Name: "craftmake", AssetStem: "craftmake", Linkage: "static"},
-	{Name: "enva", AssetStem: "enva", Linkage: "static"},
-	{Name: "xenofilx", AssetStem: "xenofilx", Linkage: "static"},
-	{Name: "pairbam", AssetStem: "pairbam", Linkage: "static"},
-	{Name: "seq2mat", AssetStem: "seq2mat", Linkage: "static"},
-	{Name: "methx", AssetStem: "methx", Linkage: "static"},
-	{Name: "qctb", AssetStem: "qctb", Linkage: "static"},
-	{Name: "fastqcx", AssetStem: "fastqcx", Linkage: "static"},
-	{Name: "matsrun", AssetStem: "matsrun", Linkage: "static"},
+var Tools = []string{
+	"otter", "craftmake", "enva", "xenofilx", "pairbam", "seq2mat",
+	"methx", "qctb", "fastqcx", "matsrun",
 }
 
 // EnvFiles are the conda environment YAML assets staged with releases.

@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -38,51 +38,91 @@ func NewClient(token, proxy string, dryRun bool) *Client {
 	}
 }
 
-// AssetName builds the release asset name for a tool on the current platform.
-func AssetName(assetStem, linkage string) string {
-	arch := runtime.GOARCH
-	if arch == "x86_64" {
-		arch = "amd64"
+// Platform identifies the release asset family. macOS binaries use the
+// system runtime, so only Linux builds carry the -static suffix.
+type Platform struct {
+	OS, Arch string
+}
+
+func NewPlatform(goos, goarch string) (Platform, error) {
+	if (goos != "linux" && goos != "darwin") || (goarch != "amd64" && goarch != "arm64") {
+		return Platform{}, fmt.Errorf("unsupported platform %s/%s (expected Linux or macOS on amd64 or arm64)", goos, goarch)
 	}
-	if arch == "aarch64" {
-		arch = "arm64"
-	}
-	name := fmt.Sprintf("%s-linux-%s", assetStem, arch)
-	if linkage == "static" {
+	return Platform{OS: goos, Arch: goarch}, nil
+}
+
+func (p Platform) AssetName(stem string) string {
+	name := stem + "-" + p.OS + "-" + p.Arch
+	if p.OS == "linux" {
 		name += "-static"
 	}
 	return name
 }
 
-// LatestTag resolves the latest release tag for a repository, preferring the
-// most recent release (including pre-releases like daily-YYYYMMDD) and falling
-// back to the latest formal release.
-func (client *Client) LatestTag(ctx context.Context, repo string) (string, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=1", repo)
-	body, err := client.get(ctx, url)
-	if err == nil {
-		var releases []struct {
-			TagName string `json:"tag_name"`
+type Release struct {
+	Tag    string `json:"tag_name"`
+	Draft  bool   `json:"draft"`
+	Assets []struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	} `json:"assets"`
+}
+
+func (release Release) AssetAPIURL(name string) string {
+	for _, asset := range release.Assets {
+		if asset.Name == name {
+			return asset.URL
 		}
-		if unmarshalErr := json.Unmarshal(body, &releases); unmarshalErr == nil && len(releases) > 0 && releases[0].TagName != "" {
-			return releases[0].TagName, nil
+	}
+	return ""
+}
+
+// FindRelease selects a release with all required assets. Older releases were
+// Linux amd64 only, and a release still being uploaded can be incomplete.
+func (client *Client) FindRelease(ctx context.Context, repo, tag string, required []string) (Release, error) {
+	base := fmt.Sprintf("https://api.github.com/repos/%s/releases", repo)
+	var releases []Release
+	if tag == "" || tag == "latest" {
+		body, err := client.get(ctx, base+"?per_page=100")
+		if err != nil {
+			return Release{}, err
+		}
+		if err := json.Unmarshal(body, &releases); err != nil {
+			return Release{}, fmt.Errorf("parse releases for %s: %w", repo, err)
+		}
+	} else {
+		body, err := client.get(ctx, base+"/tags/"+url.PathEscape(tag))
+		if err != nil {
+			return Release{}, err
+		}
+		var release Release
+		if err := json.Unmarshal(body, &release); err != nil {
+			return Release{}, fmt.Errorf("parse release %s for %s: %w", tag, repo, err)
+		}
+		releases = []Release{release}
+	}
+	for _, release := range releases {
+		if release.Tag == "" || release.Draft {
+			continue
+		}
+		present := make(map[string]bool, len(release.Assets))
+		for _, asset := range release.Assets {
+			present[asset.Name] = true
+		}
+		var missing []string
+		for _, name := range required {
+			if !present[name] {
+				missing = append(missing, name)
+			}
+		}
+		if len(missing) == 0 {
+			return release, nil
+		}
+		if tag != "" && tag != "latest" {
+			return Release{}, fmt.Errorf("%s release %s is missing assets: %s", repo, tag, strings.Join(missing, ", "))
 		}
 	}
-	latestURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
-	latestBody, latestErr := client.get(ctx, latestURL)
-	if latestErr != nil {
-		return "", fmt.Errorf("resolve latest tag for %s: %w", repo, latestErr)
-	}
-	var release struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.Unmarshal(latestBody, &release); err != nil {
-		return "", fmt.Errorf("parse latest release for %s: %w", repo, err)
-	}
-	if release.TagName == "" {
-		return "", fmt.Errorf("latest release for %s has no tag", repo)
-	}
-	return release.TagName, nil
+	return Release{}, fmt.Errorf("%s has no matching published release with all required assets", repo)
 }
 
 // Download fetches a release asset to dest, honoring proxy and token.

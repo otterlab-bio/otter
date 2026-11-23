@@ -121,8 +121,8 @@ func TestToolsCoverExpectedBinaries(t *testing.T) {
 		t.Fatalf("expected %d tools, got %d", len(expected), len(Tools))
 	}
 	for index, name := range expected {
-		if Tools[index].Name != name {
-			t.Fatalf("tool %d = %q, expected %q", index, Tools[index].Name, name)
+		if Tools[index] != name {
+			t.Fatalf("tool %d = %q, expected %q", index, Tools[index], name)
 		}
 	}
 }

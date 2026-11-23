@@ -1,16 +1,19 @@
-// Command otter-install is a statically compiled installer for the otter
-// bioinformatics toolchain. It downloads pre-built static binaries from GitHub
+// Command otter-install is a platform-aware installer for the otter
+// bioinformatics toolchain. It downloads pre-built platform binaries from GitHub
 // Releases, creates conda environments, verifies pinned tool versions, and can
 // run the Craftmake ReferenceBuild workflow.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/otterlab-bio/otter/installer/internal/assets"
@@ -44,12 +47,29 @@ func main() {
 }
 
 func run(ctx context.Context, options *config.Options) error {
+	arch := runtime.GOARCH
+	if runtime.GOOS == "darwin" && arch == "amd64" {
+		// Prefer native Apple Silicon assets even when invoked from Rosetta.
+		if result, _ := exec.CommandContext(ctx, "/usr/sbin/sysctl", "-in", "sysctl.proc_translated").Output(); strings.TrimSpace(string(result)) == "1" {
+			arch = "arm64"
+		}
+	}
+	platform, err := download.NewPlatform(runtime.GOOS, arch)
+	if err != nil {
+		return err
+	}
+	if platform.OS == "darwin" && platform.Arch == "amd64" && !options.SkipEnvs {
+		fmt.Println("macOS Intel: installing binaries only; the pinned Bismark environment is unavailable on osx-64.")
+		options.SkipEnvs = true
+	}
+
 	client := download.NewClient(options.GitHubToken, options.GitHubProxy, options.DryRun)
 
 	fmt.Printf("otter-installer %s+%s (%s)\n", version, commit, date)
 	if options.DryRun {
 		fmt.Println("DRY-RUN MODE - no changes will be made")
 	}
+	fmt.Printf("Platform: %s/%s\n", platform.OS, platform.Arch)
 	fmt.Printf("Install directory: %s\n", options.InstallDir)
 	fmt.Printf("Primary releases repo: %s\n", options.ReleasesRepo)
 	if options.FallbackReleasesRepo != "" && options.FallbackReleasesRepo != options.ReleasesRepo {
@@ -59,40 +79,15 @@ func run(ctx context.Context, options *config.Options) error {
 	fmt.Println()
 
 	// Step 1: Resolve version and download binaries.
-	tag, err := resolveTag(ctx, client, options)
+	repo, release, err := resolveRelease(ctx, client, options, platform)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Version: %s\n", tag)
-	fmt.Printf("Selected release repo: %s\n", options.ReleasesRepo)
-	fmt.Println()
-
-	if err := os.MkdirAll(options.InstallDir, 0o755); err != nil {
+	fmt.Printf("Version: %s\n", release.Tag)
+	fmt.Printf("Selected release repo: %s\n\n", repo)
+	if err := installTools(ctx, client, options.InstallDir, repo, release, platform); err != nil {
 		return err
 	}
-	for _, tool := range config.Tools {
-		asset := download.AssetName(tool.AssetStem, tool.Linkage)
-		dest := filepath.Join(options.InstallDir, tool.Name)
-		url := download.ReleaseAssetURL(options.ReleasesRepo, tag, asset)
-		if options.DryRun {
-			fmt.Printf("  [DRY-RUN] would download %s -> %s\n", url, dest)
-			continue
-		}
-		fmt.Printf("Downloading %s ...\n", tool.Name)
-		if err := client.Download(ctx, url, dest); err != nil {
-			if _, statErr := os.Stat(dest); statErr == nil {
-				fmt.Printf("  ⚠ %s download failed (%v); keeping existing binary\n", tool.Name, err)
-			} else {
-				fmt.Printf("  ⚠ %s download failed (%v); asset may not exist for this release\n", tool.Name, err)
-			}
-			continue
-		}
-		if err := os.Chmod(dest, 0o755); err != nil {
-			return err
-		}
-		fmt.Printf("  ✓ %s installed\n", tool.Name)
-	}
-	fmt.Println()
 
 	// Step 2: Deploy Craftmake workflow catalog and configurations.
 	fmt.Println("Step 2: Deploying Craftmake workflow catalog and configurations")
@@ -112,7 +107,7 @@ func run(ctx context.Context, options *config.Options) error {
 	if !options.SkipEnvs {
 		fmt.Println("  Fetching environment definitions ...")
 		for _, envFile := range config.EnvFiles {
-			url := download.ReleaseAssetURL(options.ReleasesRepo, tag, envFile)
+			url := releaseURL(client, repo, release, envFile)
 			destination := filepath.Join(options.InstallDir, envFile)
 			if options.DryRun {
 				fmt.Printf("  [DRY-RUN] would download %s -> %s\n", url, destination)
@@ -123,22 +118,6 @@ func run(ctx context.Context, options *config.Options) error {
 			}
 			fmt.Printf("  ✓ %s\n", envFile)
 		}
-	}
-	fmt.Println()
-
-	// Step 3: Verify installed tools.
-	fmt.Println("Step 3: Verifying installed tools")
-	for _, tool := range config.Tools {
-		output, err := verify.Binary(ctx, options.InstallDir, tool.Name, options.DryRun)
-		if err != nil {
-			fmt.Printf("  ⚠ %s: %v\n", tool.Name, err)
-			continue
-		}
-		if options.DryRun {
-			fmt.Printf("  [DRY-RUN] would verify: %s --version\n", tool.Name)
-			continue
-		}
-		fmt.Printf("  ✓ %s  %s\n", tool.Name, output)
 	}
 	fmt.Println()
 
@@ -213,20 +192,83 @@ func runReferenceFetch(ctx context.Context, options *config.Options, client *dow
 	return nil
 }
 
-func resolveTag(ctx context.Context, client *download.Client, options *config.Options) (string, error) {
-	if options.Version != "" && options.Version != "latest" {
-		return options.Version, nil
+func resolveRelease(ctx context.Context, client *download.Client, options *config.Options, platform download.Platform) (string, download.Release, error) {
+	// A pinned dry run deliberately does not depend on GitHub connectivity.
+	if options.DryRun && options.Version != "" && options.Version != "latest" {
+		return options.ReleasesRepo, download.Release{Tag: options.Version}, nil
 	}
-	tag, err := client.LatestTag(ctx, options.ReleasesRepo)
-	if err == nil && tag != "" {
-		return tag, nil
+	var required []string
+	for _, tool := range config.Tools {
+		required = append(required, platform.AssetName(tool))
 	}
-	if options.FallbackReleasesRepo != "" {
-		if fallbackTag, fallbackErr := client.LatestTag(ctx, options.FallbackReleasesRepo); fallbackErr == nil && fallbackTag != "" {
-			return fallbackTag, nil
+	if !options.SkipEnvs {
+		required = append(required, config.EnvFiles...)
+	}
+	var failures []error
+	for i, repo := range []string{options.ReleasesRepo, options.FallbackReleasesRepo} {
+		if repo == "" || (i == 1 && repo == options.ReleasesRepo) {
+			continue
+		}
+		release, err := client.FindRelease(ctx, repo, options.Version, required)
+		if err == nil {
+			return repo, release, nil
+		}
+		failures = append(failures, err)
+	}
+	return "", download.Release{}, fmt.Errorf("resolve release for %s/%s: %w", platform.OS, platform.Arch, errors.Join(failures...))
+}
+
+func releaseURL(client *download.Client, repo string, release download.Release, asset string) string {
+	if client.Token != "" && client.Proxy == "" {
+		if apiURL := release.AssetAPIURL(asset); strings.HasPrefix(apiURL, "https://api.github.com/repos/"+repo+"/releases/assets/") {
+			return apiURL
 		}
 	}
-	return "", fmt.Errorf("could not determine latest release version from %s or %s", options.ReleasesRepo, options.FallbackReleasesRepo)
+	return download.ReleaseAssetURL(repo, release.Tag, asset)
+}
+
+func installTools(ctx context.Context, client *download.Client, dir, repo string, release download.Release, platform download.Platform) error {
+	var staging string
+	if !client.DryRun {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+		var err error
+		staging, err = os.MkdirTemp(dir, ".otter-install-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(staging)
+	}
+	for _, tool := range config.Tools {
+		asset := platform.AssetName(tool)
+		url := releaseURL(client, repo, release, asset)
+		if client.DryRun {
+			fmt.Printf("  [DRY-RUN] would download %s -> %s\n", url, filepath.Join(dir, tool))
+			continue
+		}
+		fmt.Printf("Downloading %s ...\n", asset)
+		path := filepath.Join(staging, tool)
+		if err := client.Download(ctx, url, path); err != nil {
+			return fmt.Errorf("download %s: %w", asset, err)
+		}
+		if err := os.Chmod(path, 0o755); err != nil {
+			return err
+		}
+		if _, err := verify.Binary(ctx, staging, tool, false); err != nil {
+			return fmt.Errorf("verify %s: %w", asset, err)
+		}
+	}
+	// Do not overwrite existing tools if any download failed or could not run.
+	if !client.DryRun {
+		for _, tool := range config.Tools {
+			if err := os.Rename(filepath.Join(staging, tool), filepath.Join(dir, tool)); err != nil {
+				return err
+			}
+			fmt.Printf("  ✓ %s installed\n", tool)
+		}
+	}
+	return nil
 }
 
 func runReferenceBuild(ctx context.Context, options *config.Options, envaPath, packageManager string) error {

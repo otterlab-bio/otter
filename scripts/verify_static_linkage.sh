@@ -12,7 +12,11 @@ if [[ ! -d "${DIST_DIR}" ]]; then
   exit 1
 fi
 
-mkdir -p "${REPORT_DIR}/file" "${REPORT_DIR}/ldd"
+platform="${3:-linux-amd64}"
+case "$platform" in linux-amd64|linux-arm64) ;; *) echo "Static linkage is only checked for Linux" >&2; exit 1 ;; esac
+required="$(bash "${ARTIFACT_LIST_SCRIPT}" --print-required "$platform")"
+
+mkdir -p "${REPORT_DIR}/file" "${REPORT_DIR}/ldd" "${REPORT_DIR}/readelf"
 
 report_table="${REPORT_DIR}/static-linkage.tsv"
 summary_file="${REPORT_DIR}/static-linkage-summary.md"
@@ -25,10 +29,12 @@ while IFS= read -r artifact_name; do
   artifact_path="${DIST_DIR}/${artifact_name}"
   file_log="${REPORT_DIR}/file/${artifact_name}.log"
   ldd_log="${REPORT_DIR}/ldd/${artifact_name}.log"
+  elf_log="${REPORT_DIR}/readelf/${artifact_name}.log"
 
   if [[ ! -x "${artifact_path}" ]]; then
     printf 'missing\n' > "${file_log}"
     printf 'missing\n' > "${ldd_log}"
+    printf 'missing\n' > "${elf_log}"
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${artifact_name}" "-" "-" "missing" "-" "FAIL" >> "${report_table}"
     printf '| `%s` | FAIL | - | missing executable |\n' "${artifact_name}" >> "${summary_file}"
     failure_count=$((failure_count + 1))
@@ -48,10 +54,11 @@ while IFS= read -r artifact_name; do
   artifact_size_bytes="$(stat --format='%s' "${artifact_path}")"
 
   linkage_status="FAIL"
-  if printf '%s\n' "${ldd_output}" | grep -Eqi 'not a dynamic executable|statically linked'; then
-    if ! printf '%s\n' "${ldd_output}" | grep -Eqi '=>[[:space:]]*/|linux-vdso|ld-linux|libc\.so|not found'; then
-      linkage_status="PASS"
-    fi
+  # Inspect ELF headers: ldd alone can give the same message for a foreign
+  # architecture or a non-ELF file, and can misreport musl static PIE.
+  if readelf -l -d "${artifact_path}" > "$elf_log" 2>&1 &&
+    ! grep -Eq '^[[:space:]]*INTERP[[:space:]]|[(]NEEDED[)]' "$elf_log"; then
+    linkage_status="PASS"
   fi
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
@@ -61,20 +68,21 @@ while IFS= read -r artifact_name; do
     "$(printf '%s' "${file_output}" | tr '\t\n' ' ')" \
     "${ldd_exit_code}" \
     "${linkage_status}" >> "${report_table}"
-  printf '| `%s` | %s | %s | `file/%s.log`, `ldd/%s.log` |\n' \
+  printf '| `%s` | %s | %s | `file/%s.log`, `ldd/%s.log`, `readelf/%s.log` |\n' \
     "${artifact_name}" \
     "${linkage_status}" \
     "${ldd_exit_code}" \
+    "${artifact_name}" \
     "${artifact_name}" \
     "${artifact_name}" >> "${summary_file}"
 
   if [[ "${linkage_status}" != "PASS" ]]; then
     failure_count=$((failure_count + 1))
   fi
-done < <("${ARTIFACT_LIST_SCRIPT}" --print-required)
+done <<< "$required"
 
 printf '\nVerified artifacts: %s\nFailures: %s\n' \
-  "$("${ARTIFACT_LIST_SCRIPT}" --print-required | wc -l | tr -d ' ')" \
+  "$(printf '%s\n' "$required" | wc -l | tr -d ' ')" \
   "${failure_count}" >> "${summary_file}"
 
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
