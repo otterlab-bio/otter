@@ -47,10 +47,12 @@ directory before `workflows/`.
 | `methx` | Rust | Bismark-to-custom-HDF5 methylation processor; native Methrix interoperability is provided by `scripts/export_methrix_hdf5.R` | The task is about methylation processing, CpG extraction, QC, or Methrix export |
 | `qctb` | Rust | QC summary reporting CLI for sequencing workflows | The task is about QC summary generation or replacing legacy R QC scripts |
 | `fastqcx` | Rust | FASTQ QC report generator with HTML and MultiQC summary output | The task is about raw FASTQ QC metrics, HTML reports, or summary file generation |
+| `holt` | Docker | Containerized workbench (`holt-build` base + `holt-run` image). `holt-run` resolves the newest stable OTTER release at build time, verifies each asset against the release `checksums.txt`, and publishes whichever of linux/amd64 and linux/arm64 the resolved release ships | The task is about container images, the `holt-run` Dockerfile, or packaged environments |
 
 ## Cross-repo guidance
 
 - Start in the repo that owns the behavior being changed. Only cross into another repo when the interface boundary demands it.
 - If a change in `bamdriver` affects `xenofilx` or `pairbam`, verify both consumers still compile or explain why you did not verify them.
 - If `otter` changes integration with `enva`, `qctb`, `matsrun`, `seq2mat`, or other submodules, mention which boundary changed: CLI invocation, file layout, embedded assets, or expected outputs.
+- `holt` consumes this repository only through published release assets and the container is not part of the Go/Rust build; changing `holt-run` never requires rebuilding the binaries.
 - `fastqcx` and some other submodules are standalone tools even when vendored here; avoid root-specific assumptions leaking into their own CLI semantics.

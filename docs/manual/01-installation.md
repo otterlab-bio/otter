@@ -64,7 +64,37 @@ git submodule update --init --recursive
 git submodule status --recursive
 ```
 
-The independent component directories are `craftmake`, `enva`, `fastqcx`, `xenofilx`, `pairbam`, `seq2mat`, `matsrun`, `qctb`, `methx`, and `bamdriver`.
+The independent component directories are `craftmake`, `enva`, `fastqcx`, `xenofilx`, `pairbam`, `seq2mat`, `matsrun`, `qctb`, `methx`, `bamdriver`, and the container repository `holt`.
+
+## Container image
+
+The [`holt`](../../holt) submodule builds the containerized workbench, and its
+`holt-run` image supersedes the old Dockerfile that used to live in this
+repository root. The image resolves the newest stable OTTER release at build
+time, so it follows this repository instead of pinning a version:
+
+```bash
+docker run --rm -it -p 2222:2222 ghcr.io/otterlab-bio/holt-run:latest otter --version
+```
+
+`holt-run` is rebuilt weekly and also whenever this repository publishes a
+release. To build locally, pin a release for a reproducible image:
+
+```bash
+git submodule update --init holt
+docker build --build-arg OTTER_VERSION=v1.3.0 -t holt-run ./holt/holt-run
+```
+
+`OTTER_VERSION` defaults to `latest`. Builds accept both `linux/amd64` and
+`linux/arm64` (`docker buildx build --platform ...`). Each tool is checked
+against the release's `checksums.txt` before it is installed, and the
+environment YAML files come from the same release, so binaries and runtime
+definitions cannot drift apart.
+
+The image also contains SSH, JupyterLab with the Posit Ark kernel, and a
+pre-initialized `otter-core` environment created with `enva`; see
+[holt](https://github.com/otterlab-bio/holt) for ports and user management.
+
 
 ## Runtime environments
 

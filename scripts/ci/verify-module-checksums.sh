@@ -79,7 +79,12 @@ while IFS= read -r gomod; do
 
   checked=$((checked + 1))
   printf '   ok\n'
-done < <(find "$ROOT_DIR" -name go.mod -not -path '*/.git/*' | sort)
+done < <(
+  # Only tracked modules. Hidden directories such as .delta/ hold local tool
+  # worktrees whose module caches may be stale, and they are not part of the
+  # repository.
+  find "$ROOT_DIR" -name go.mod -not -path '*/.git/*' -not -path '*/.*' | sort
+)
 
 if [ "$checked" -eq 0 ]; then
   echo 'error: no go.mod files found' >&2

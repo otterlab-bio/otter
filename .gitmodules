@@ -28,3 +28,6 @@
 [submodule "craftmake"]
 	path = craftmake
 	url = https://github.com/otterlab-bio/craftmake.git
+[submodule "holt"]
+	path = holt
+	url = https://github.com/otterlab-bio/holt.git

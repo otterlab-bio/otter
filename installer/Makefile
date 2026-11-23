@@ -1,5 +1,5 @@
 GO ?= go
-VERSION ?= 1.2.2
+VERSION ?= 1.3.0
 COMMIT ?= unknown
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 BINARY ?= otter-install
