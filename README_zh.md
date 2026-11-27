@@ -18,7 +18,8 @@
   <a href="#快速上手">快速上手</a> ·
   <a href="#工作流体系">工作流体系</a> ·
   <a href="#组件">组件体系</a> ·
-  <a href="#文档入口">文档中心</a>
+  <a href="#文档入口">文档中心</a> ·
+  <a href="https://otter.rainoffallingstar.com/">项目主页</a>
 </p>
 
 ---
@@ -216,6 +217,12 @@ executor 属于 run snapshot，因此该选择不会写进 `project.yaml`，而�
 - [Schema](docs/schema/)：项目配置、run snapshot、reference、lock 和 artifact manifest 的 JSON Schema。
 - [离线 e2e 演练](scripts/e2e/otter_e2e.sh)：在无网络环境下驱动真实二进制，验证 authoring、build、site、配对和迁移契约。
 - [Methx → 原生 Methrix HDF5 转换函数](methx/scripts/export_methrix_hdf5.R)
+
+## 项目主页
+
+[otter.rainoffallingstar.com](https://otter.rainoffallingstar.com/) 是项目的公开入口，提供各平台的安装说明、无需本地安装的 Colab 演练、工作流体系与算子概览、用户手册以及基准测试结果。
+
+主页源码位于独立公开仓库 [`otterlab-bio/otterlab-bio.github.io`](https://github.com/otterlab-bio/otterlab-bio.github.io)，使用 Hugo 与 Blowfish 主题构建。该仓库 `main` 分支的每次推送都会通过 `.github/workflows/pages.yml` 构建并发布到 GitHub Pages，`otterlab-bio.github.io` 会重定向到该自定义域名。站点文案保存在 `data/home/*.yaml`，手册页面位于 `content/docs/manual/`；手册章节从本仓库的 `docs/manual/` 同步而来，因此文档修订先在本仓库完成，再同步到站点。主页的修改请求与勘误请提交到主页仓库的 issue。
 
 ## 引用
 

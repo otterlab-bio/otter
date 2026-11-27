@@ -18,7 +18,8 @@
   <a href="#quick-start">Quick Start</a> ·
   <a href="#the-workflow-stack">Workflow Stack</a> ·
   <a href="#components">Components</a> ·
-  <a href="#documentation">Documentation</a>
+  <a href="#documentation">Documentation</a> ·
+  <a href="https://otter.rainoffallingstar.com/">Website</a>
 </p>
 
 ---
@@ -293,6 +294,21 @@ root that already carries the pinned workflow assets. See
 - [Worked examples](docs/examples/) — complete project configurations.
 - [Schemas](docs/schema/) — configuration and manifest schemas.
 - [Methx → native Methrix HDF5 exporter](methx/scripts/export_methrix_hdf5.R) — R-side interoperability path.
+
+## Project homepage
+
+[otter.rainoffallingstar.com](https://otter.rainoffallingstar.com/) is the public entry point to the
+project. It carries the per-platform installation instructions, the no-install Colab walkthrough, an
+overview of the workflow stack and its operators, the manual, and the benchmark results.
+
+The site sources live in a separate public repository,
+[`otterlab-bio/otterlab-bio.github.io`](https://github.com/otterlab-bio/otterlab-bio.github.io),
+built with Hugo and the Blowfish theme. Every push to that repository's `main` branch builds and
+deploys it through `.github/workflows/pages.yml` to GitHub Pages, and `otterlab-bio.github.io`
+redirects to the custom domain. Site copy is kept in `data/home/*.yaml` and the manual pages under
+`content/docs/manual/`; the manual chapters are synchronised from `docs/manual/` in this repository,
+so corrections to the documentation are authored here first and then synced to the site. File new
+site requests or corrections as issues on the homepage repository.
 
 ## Citation
 
